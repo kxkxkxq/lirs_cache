@@ -3,28 +3,28 @@
 #include <map>
 #include <queue>
 #include "data.hpp"
+#include "cache.hpp"
+
 //libfmt to use fmt::print
 
 int main()
 {
-    Data_::Data<int> idata;
+    data::Data<int> idata;
     idata.input_data();
+    lirscache::Cache<int> icache{idata.csize};
 
+#if 1
     idata.printf_input_data();
-
-    return 0;
-#if 0
-    typedef LIRSCache::Cache Cache;
-    Cache = Cache();
-
+    std::cout << "\ncsize == " << icache.csize << "\n";
+#endif 
     unsigned nhits = 0;
+#if 1
 
-    typedef std::vector vector;
-    for(vector<T>::iterator i = data_begin(Data); i != data_end(Data); ++i)
-    {
-        nhits += Cache::process_request(Data);
-    }   
+    size_t j = 0;
+    for(auto i = idata.requests.begin(); i != idata.requests.begin(); ++i, ++j)
+        nhits += icache.process_request(idata.requests[j]); 
 
-    Data_::print_nhits(); 
-#endif      
+    data::print_nhits(nhits); 
+#endif
+    return 0;       
 }
