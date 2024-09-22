@@ -14,17 +14,14 @@ int main()
     lirscache::Cache<int> icache{idata.csize};
 
 #if 1
+    std::cerr << "      main() : \n";
     idata.printf_input_data();
-    std::cout << "\ncsize == " << icache.csize << "\n";
+    std::cout << "csize == " << icache.csize << "\n";
 #endif 
+
     unsigned nhits = 0;
-#if 1
-
-    size_t j = 0;
-    for(auto i = idata.requests.begin(); i != idata.requests.begin(); ++i, ++j)
+    for(unsigned j = 0; j < idata.nrequests; ++j)
         nhits += icache.process_request(idata.requests[j]); 
-
-    data::print_nhits(nhits); 
-#endif
-    return 0;       
+    
+    data::print_nhits(nhits);        
 }
