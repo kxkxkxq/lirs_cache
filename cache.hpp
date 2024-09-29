@@ -7,71 +7,75 @@
 #include <queue>
 #include <list>
 #include <cassert>
+#include <string>
 
-namespace lirscache
+namespace caches
 {
-    enum STATUS 
+    enum Status
     {
-        LIR,            //lir-block
-        HIR_R,          //resident hir-block
-        HIR_NR          //non-resident hir-block
+        lir_,            //lir-block
+        hirr_,          //resident hir-block
+        hirnr_          //non-resident hir-block
     };
 
-    template <typename U> struct page_t
+    template <typename KeyT, typename T> struct pnode_t
     {
-        U key;
-        typename std::deque<U>::iterator itq;
+        typename std::deque<KeyT>::iterator itq;
+        const data::data_t<KeyT, T>& itd;
+        int status = hirr_;
+        KeyT key_;
         
-        page_t(const U key_) : key(key_) {};
+        pnode_t(const KeyT k, const data::data_t<KeyT, T>& d) : key_(k), itd(d) {};
     };
 
-
-    template <typename U> class Cache
+    template <typename KeyT, typename T> class lirs
     {
-        std::unordered_multimap<U, page_t<U>>* hashtable;
-        std::deque<U>* udeque;
-        std::list<U>* ulist;
+        std::unordered_multimap<KeyT, pnode_t<KeyT, T>> hashtable; //we need to write : hashtable::insert({key, page_});
+        std::deque<KeyT> tdeque;
+        std::list<KeyT> tlist;
    
     public:
       
         unsigned csize = 0;
 
-        using udata = typename data::Data<U>;
-        int process_request(const U req);
-        
-        Cache(const unsigned sz) : csize(sz) 
-        {
-            hashtable = new std::unordered_multimap<U, page_t<U>>;
-            udeque = new std::deque<U>;
-            ulist = new std::list<U>;
-        };
-        
-        ~Cache()
-        {
-            delete ulist;
-            delete udeque;
-            delete hashtable;
-        };
+        int process_request(const data::data_t<KeyT, T> &dref);
+        void process_hashtable_pair(const std::pair< KeyT, pnode_t<KeyT, T>>& h); //i will need such func later
+
+        lirs(const unsigned sz) : csize(sz) {};
     };
 
 }
 
-template <typename U> int lirscache::Cache<U>::process_request(const U req)
+template <typename KeyT, typename T> 
+int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 {
-    page_t<U>* ppage = new page_t<U>{req};
+    tdeque.push_front(dref.key_);
+    pnode_t<KeyT, T> *ppage = new pnode_t<KeyT, T> {dref.key_, dref};
+
+    KeyT k = dref.key_;
+    auto is_suitable_key = [k] (KeyT key) {return key == k; };
+    ppage->itq = find_if(tdeque.begin(), tdeque.end(), is_suitable_key);
 
 #if 1
-    std::cout << "\n      cache::process_request() : page.key == " << ppage->key << '\n';
-    std::cerr << "              req == " << req << "\n";
-    std::cerr << "              &page_t == " << ppage << "\n";
+    std::cerr << "\n---------------------------------------------------------------------------\n";
+    std::cerr << "\n      lirs::process_request() : ppage->key_ == " << ppage->key_ << '\n';
+    std::cerr << "          request == " << dref.key_ << "\n";
+    std::cerr << "          &pnode_t == " << ppage << "\n";
+
+    std::cerr << "          tdeque->front() == " << tdeque.front() << "\n";
+    const data::data_t<KeyT, T> d = ppage->itd;
+    std::cerr << "          &page.itd == " << &d << "\n";
+    std::cerr << "          page.itq == " << *ppage->itq << "\n";         
 #endif
 
-    udeque->push_front(ppage->key);
-    ppage->itq = udeque->begin();
+    hashtable.insert({ppage->key_, *ppage});
 
 #if 1
-    std::cerr << "      cache::process_request() : udeque->front() == " << udeque->front() << "\n";
-    std::cerr << "          page.itq == " << *ppage->itq << "\n";         
+    std::cerr << "\n        inserted pair{" << ppage->key_ << ", " << ppage << "}\n";
+    std::cerr << "      hashtable pair{KeyT, pnode_t<KeyT, T>} : ";
+    
+    auto it = hashtable.find(ppage->key_);
+    std::cerr << "{pair.first == " << it->first << ", pair.second.key == " << it->second.key_ << "}\n";
 #endif
 
     return 0;
