@@ -49,8 +49,9 @@ template <typename KeyT, typename T> void data::Data<KeyT, T>::input_data()
 #if 1
         std::cout << "inputed key == " << key << "\n"; 
 #endif
-        data_t<KeyT, T> *d = new data_t<KeyT, T>{key};
-        requests.push_back(*d);
+        //data_t<KeyT, T> *d = new data_t<KeyT, T>{key};
+        //requests.push_back(*d);
+        requests.emplace_back(data_t<KeyT, T>{key});
     }
 }
 

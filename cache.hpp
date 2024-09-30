@@ -50,32 +50,24 @@ template <typename KeyT, typename T>
 int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 {
     tdeque.push_front(dref.key_);
-    pnode_t<KeyT, T> *ppage = new pnode_t<KeyT, T> {dref.key_, dref};
-
-    KeyT k = dref.key_;
+    auto itp = hashtable.emplace(std::pair{dref.key_, pnode_t<KeyT, T>{dref.key_, dref}}); 
+                                                                                            //iterator    == itp->second
+    KeyT k = dref.key_;                                                                     //pnode_t.itq == iterator->itq
     auto is_suitable_key = [k] (KeyT key) {return key == k; };
-    ppage->itq = find_if(tdeque.begin(), tdeque.end(), is_suitable_key);
+    itp->second.itq = find_if(tdeque.begin(), tdeque.end(), is_suitable_key);
 
 #if 1
-    std::cerr << "\n---------------------------------------------------------------------------\n";
-    std::cerr << "\n      lirs::process_request() : ppage->key_ == " << ppage->key_ << '\n';
+    std::cerr << "\n---------------------------------------------------------------------------\n\n";
+    std::cerr << "      lirs::process_request() : pnode_t.key_ == " << itp->second.key_ << '\n';
     std::cerr << "          request == " << dref.key_ << "\n";
-    std::cerr << "          &pnode_t == " << ppage << "\n";
+    std::cerr << "          &pnode_t == " << &itp->second << "\n\n";
 
     std::cerr << "          tdeque->front() == " << tdeque.front() << "\n";
-    const data::data_t<KeyT, T> d = ppage->itd;
-    std::cerr << "          &page.itd == " << &d << "\n";
-    std::cerr << "          page.itq == " << *ppage->itq << "\n";         
-#endif
+    std::cerr << "          &pnode_t.itd == " << &itp->second.itd << "\n";
+    std::cerr << "          pnode_t.itq == " << *itp->second.itq << "\n";         
 
-    hashtable.insert({ppage->key_, *ppage});
-
-#if 1
-    std::cerr << "\n        inserted pair{" << ppage->key_ << ", " << ppage << "}\n";
     std::cerr << "      hashtable pair{KeyT, pnode_t<KeyT, T>} : ";
-    
-    auto it = hashtable.find(ppage->key_);
-    std::cerr << "{pair.first == " << it->first << ", pair.second.key == " << it->second.key_ << "}\n";
+    std::cerr << "{KeyT elem == " << itp->first << ", pnode_t<KeyT, T>.KeyT elem == " << itp->second.key_ << "}\n";
 #endif
 
     return 0;
