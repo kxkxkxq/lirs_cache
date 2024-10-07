@@ -21,7 +21,7 @@ namespace caches
 
     template <typename KeyT, typename T> struct pnode_t
     {
-        typename std::deque<KeyT>::iterator itq;
+        //typename std::deque<KeyT>::iterator itq;
         const data::data_t<KeyT, T>& itd;
         int status = hirr_;
         KeyT key_;
@@ -42,10 +42,11 @@ namespace caches
             void push_front(const KeyT k);
         };
 
-        std::unordered_multimap<KeyT, pnode_t<KeyT, T>> hashtable; //we need to write : hashtable::insert({key, page_});
-        std::deque<KeyT> tdeque;
         list_t lhirs;      //part of cache for hirs elements (approximately 1% of cache size)
         list_t llirs;      //part of cache for lirs elements (approximately 99% of cache size)
+        std::unordered_multimap<KeyT, pnode_t<KeyT, T>> hashtable;
+        std::deque<KeyT> tdeque;
+        
    
     public:
 
@@ -97,20 +98,27 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 #if 1
     std::cerr << "ht_it->first == " << ht_it->first << "\n";
     std::cerr << "ht_it->second.key_ == " << ht_it->second.key_ << "\n";
-    std::cerr << "*ht_it->second.itq == " << *ht_it->second.itq << "\n";
 #endif
-    assert(ht_it->first == *ht_it->second.itq);
+
     if(llirs.list_.size() <= llirs.cap)
     {
         ht_it->second.status = lir_;
 
         if(ht_it->first != *tdeque.begin())
-            std::rotate(tdeque.begin(), ht_it->second.itq, ht_it->second.itq + 1);
+        {
+            auto qe = std::find(tdeque.begin(), tdeque.end(), ht_it->first);
+            std::rotate(tdeque.begin(), qe, (qe + 1)); 
+        }
 
         llirs.push_front(ht_it->first);
 #if 1        
         std::cerr << "      lirs list : ";
         for(auto i = llirs.list_.begin(); i != llirs.list_.end(); ++i)
+            std::cerr << *i << " ";
+        std::cerr << "\n";
+
+        std::cerr << "      hirs list : ";
+        for(auto i = lhirs.list_.begin(); i != lhirs.list_.end(); ++i)
             std::cerr << *i << " ";
         std::cerr << "\n";
 
@@ -131,7 +139,17 @@ void caches::lirs<KeyT, T>::push_new_request(const data::data_t<KeyT, T>& dref)
                                                                                             //iterator    == itp->second
     KeyT k = dref.key_;                                                                     //pnode_t.itq == iterator->itq
     auto is_suitable_key = [k] (KeyT key) {return key == k; };
-    itp->second.itq = find_if(tdeque.begin(), tdeque.end(), is_suitable_key);
+
+#if 0 // move it somewhere else
+    if(lhirs.list_.size() >= lhirs.cap)                 // freeing up space 
+    {                                                   // to push front new request
+        auto i = hashtable.find(lhirs.list_.front());
+        i->second.status = hirnr_;
+        lhirs.list_.pop_back();
+    }
+
+    lhirs.push_front(k);
+#endif
 
 #if 0
     std::cerr << "\n---------------------------------------------------------------------------\n\n";
@@ -142,8 +160,7 @@ void caches::lirs<KeyT, T>::push_new_request(const data::data_t<KeyT, T>& dref)
     std::cerr << "          &pnode_t == " << &itp->second << "\n\n";
 
     std::cerr << "          tdeque->front() == " << tdeque.front() << "\n";
-    std::cerr << "          &pnode_t.itd == " << &itp->second.itd << "\n";
-    std::cerr << "          pnode_t.itq == " << *itp->second.itq << "\n";         
+    std::cerr << "          &pnode_t.itd == " << &itp->second.itd << "\n";         
 
     std::cerr << "      hashtable pair{KeyT, pnode_t<KeyT, T>} : ";
     std::cerr << "{KeyT elem == " << itp->first << ", pnode_t<KeyT, T>.KeyT elem == " << itp->second.key_ << "}\n\n";
@@ -158,13 +175,7 @@ void caches::lirs<KeyT, T>::push_new_request(const data::data_t<KeyT, T>& dref)
 
 template <typename KeyT, typename T> void caches::lirs<KeyT, T>::list_t::push_front(const KeyT k)
 {
-    std::cerr << "key == " << k << "\n";
     auto itl = std::find(list_.begin(), list_.end(), k);
-    
-    if((list_.size() > 1) && (*itl == *list_.begin()))
-    {
-        return;
-    }   
 
     (itl == list_.end()) 
     ? list_.push_front(k) 
