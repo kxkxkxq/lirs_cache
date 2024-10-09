@@ -14,14 +14,19 @@ namespace caches
 {
     enum Status
     {
-        lir_,            //lir-block
-        hirr_,          //resident hir-block
-        hirnr_          //non-resident hir-block
+         lir_            //lir-block
+        ,hirr_          //resident hir-block
+        ,hirnr_          //non-resident hir-block
+    };
+
+    enum Cachehit
+    {
+         miss_
+        ,hit_        
     };
 
     template <typename KeyT, typename T> struct pnode_t
     {
-        //typename std::deque<KeyT>::iterator itq;
         const data::data_t<KeyT, T>& itd;
         int status = hirr_;
         KeyT key_;
@@ -72,6 +77,7 @@ namespace caches
         int process_request(const data::data_t<KeyT, T> &dref);
         void process_hashtable_pair(const std::pair< KeyT, pnode_t<KeyT, T>>& h); //i will need such func later
         void push_new_request(const data::data_t<KeyT, T> &dref);
+        void rotate_deque_if(const KeyT k);
     };
 
 }
@@ -80,17 +86,8 @@ template <typename KeyT, typename T>
 int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 {
     if(auto it = hashtable.find(dref.key_); it == hashtable.end())
-    {
-#if 1
-        std::cerr << "          key " << dref.key_ << " not found\n"; 
-#endif
         push_new_request(dref);
-    }  
 
-#if 1      
-    else
-        std::cerr << "          key " << dref.key_ << " was found\n";
-#endif
 
     auto ht_it = hashtable.find(dref.key_); //ht_it == hashtable iterator to pair {KeyT, pnode_t}
     assert(ht_it != hashtable.end());
@@ -100,17 +97,12 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
     std::cerr << "ht_it->second.key_ == " << ht_it->second.key_ << "\n";
 #endif
 
-    if(llirs.list_.size() <= llirs.cap)
+    if(llirs.list_.size() < llirs.cap)
     {
         ht_it->second.status = lir_;
-
-        if(ht_it->first != *tdeque.begin())
-        {
-            auto qe = std::find(tdeque.begin(), tdeque.end(), ht_it->first);
-            std::rotate(tdeque.begin(), qe, (qe + 1)); 
-        }
-
+        rotate_deque_if(ht_it->first);
         llirs.push_front(ht_it->first);
+
 #if 1        
         std::cerr << "      lirs list : ";
         for(auto i = llirs.list_.begin(); i != llirs.list_.end(); ++i)
@@ -127,7 +119,30 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
             std::cerr << *i << " ";
         std::cerr << "\n\n";
 #endif
+        return miss_;
     }
+    
+    switch(ht_it->second.status)
+    {
+        case lir_  : //accessing lir element
+                    rotate_deque_if(ht_it->first);
+                    llirs.push_front(ht_it->first);
+                    deque_prunning();
+
+                    return hit_;
+
+        case hirr_ : //accessing hir resident element
+                    rotate_deque_if(ht_it->first);
+
+
+
+    }
+
+
+
+
+
+
     return 0;
 }
 
@@ -180,6 +195,15 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::list_t::push_fr
     (itl == list_.end()) 
     ? list_.push_front(k) 
     : list_.splice(list_.begin(), list_, itl);
+}
+
+template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_deque_if(const KeyT k)
+{
+    if(k != *tdeque.begin())
+    {
+        auto qe = std::find(tdeque.begin(), tdeque.end(), k);
+        std::rotate(tdeque.begin(), qe, (qe + 1)); 
+    }
 }
 
 #endif
