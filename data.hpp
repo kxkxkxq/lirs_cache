@@ -2,6 +2,7 @@
 #define DATA_HPP
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -12,19 +13,17 @@ namespace data
 {
     template <typename KeyT, typename T> struct data_t
     {
-        KeyT key_;  
-        T rqst_;    
+        KeyT key;  
+        T rqst;    
 
-        data_t(const KeyT key, const T rqst) : key_(key), rqst_(rqst) {};
-        data_t(const KeyT key)               : key_(key) {};
+        data_t(const KeyT &k, const T &r) : key(k), rqst(r) {};
+        data_t(const KeyT &k)               : key(k) {};
     };
     
     template <typename KeyT, typename T> struct Data
     {
         std::vector<data_t<KeyT, T>> requests; 
-    public:
-        
-        unsigned csize = 0, nrequests = 0;
+        size_t csize = 0;
         
         void input_data();
         void fill_requests_with_data();
@@ -36,29 +35,34 @@ namespace data
 
 template <typename KeyT, typename T> void data::Data<KeyT, T>::input_data()
 {
-    std::cin >> csize >> nrequests;
-    requests.reserve(nrequests);
+    size_t n = 0;
+    std::cin >> csize >> n;
+    assert(std::cin.good());
     
-    for(size_t i = 0; i < nrequests; ++i)
+    requests.reserve(n);
+    
+    for(size_t i = 0; i < n; ++i)
     {
-        KeyT key;
-        std::cin >> key;
-        requests.emplace_back(data_t<KeyT, T>{key});
+        KeyT k;
+        std::cin >> k;
+        assert(std::cin.good() || std::cin.eof());
+ 
+        const data_t<KeyT, T> d = requests.emplace_back(data_t<KeyT, T>{k});
+        assert(d.key == k);
     }
 }
 
 template <typename KeyT, typename T> void data::Data<KeyT, T>::printf_input_data()
 {
-    std::cout << "csize == " << csize << "\nnrequests == " << nrequests << '\n';
+    std::cout << "csize == " << csize << "\nnrequests == " << requests.size() << '\n';
     
-    for(unsigned i = 0; i < nrequests; ++i)
+    for(auto i = requests.begin(); i != requests.end(); ++i)
     {
-        data_t<KeyT, T> data = requests[i];
-        KeyT k = data.key_;
-        auto is_suitable_key = [k] (data_t<KeyT, T>& d) {return d.key_ == k; };
+        const KeyT &k = *i.key;
+        auto is_suitable_key = [&k] (const data_t<KeyT, T>& d) {return d.key == k; };
 
         auto it = std::find_if(requests.begin(), requests.end(), is_suitable_key);  //write .at() for requests
-        std::cerr << "requests[" << i << "].key == " << it->key_ << "\n";
+        std::cout << "requests[" << i << "].key == " << it->key << "\n";
     }
 }
 
