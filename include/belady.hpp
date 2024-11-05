@@ -12,16 +12,11 @@
 
 namespace caches
 {
-    enum Cachehit
-    {
-        miss,
-        hit
-    };
 
     template <typename KeyT, typename T> class belady
     {
         size_t cap = 0;
-        
+
         std::deque<data::data_t<KeyT, T>> tdeque;
         std::list<KeyT> blist;
         std::unordered_multimap<KeyT, size_t> hashtable;
@@ -33,7 +28,7 @@ namespace caches
 public:
 
         belady(const size_t c, const std::vector<data::data_t<KeyT, T>>& rqsts) : cap(c) {fill_tdeque_and_hashtable(rqsts); }; 
-        int proccess_request(const data::data_t<KeyT, T> &dref);
+        bool process_request(const data::data_t<KeyT, T> &dref);
     };
 }
 
@@ -49,8 +44,11 @@ void caches::belady<KeyT, T>::fill_tdeque_and_hashtable(const std::vector<data::
 }
 
 template <typename KeyT, typename T> 
-int caches::belady<KeyT, T>::proccess_request(const data::data_t<KeyT, T> &dref)
+bool caches::belady<KeyT, T>::process_request(const data::data_t<KeyT, T> &dref)
 {
+    if(cap == 0)
+        return false;
+
     auto ht_it = hashtable.find(dref.key);
     assert(ht_it != hashtable.end());
     auto b_it = std::find(blist.begin(), blist.end(), dref.key);
@@ -61,7 +59,7 @@ int caches::belady<KeyT, T>::proccess_request(const data::data_t<KeyT, T> &dref)
         {
             blist.push_front(ht_it->first);
             hashtable.erase(ht_it);
-            return miss;
+            return false;
         }
 
         auto de_it = find_farthest_request(ht_it->first);
@@ -70,7 +68,7 @@ int caches::belady<KeyT, T>::proccess_request(const data::data_t<KeyT, T> &dref)
         blist.push_front(ht_it->first);
         hashtable.erase(ht_it);
 
-        return miss;
+        return false;
 
     }
 
@@ -78,7 +76,7 @@ int caches::belady<KeyT, T>::proccess_request(const data::data_t<KeyT, T> &dref)
     {
         rotate_blist_if(ht_it->first);
         hashtable.erase(ht_it);
-        return hit;
+        return true;
     }
 
     return 0;

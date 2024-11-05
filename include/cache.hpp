@@ -12,32 +12,24 @@
 
 namespace caches
 {
-    enum Status
-    {
-        lir    ,          //lir-block
-        hirr   ,          //resident hir-block
-        hirnr             //non-resident hir-block
-    };
-
-    enum Cachehit
-    {
-        miss   ,
-        hit        
-    };
-
-    template <typename KeyT, typename T> struct pnode_t
-    {
-        const data::data_t<KeyT, T>& itd;
-        int status = hirr;
-        KeyT key;
-        
-        pnode_t(const KeyT k, const data::data_t<KeyT, T>& d) : key(k), itd(d) {};
-    };
-
     template <typename KeyT, typename T> class lirs
     {
-        size_t csize = 0;
+        enum Status
+        {
+            lir    ,          //lir-block
+            hirr   ,          //resident hir-block
+            hirnr             //non-resident hir-block
+        };
+
+        struct pnode_t
+        {
+            const data::data_t<KeyT, T>& itd;
+            int status = hirr;
+            KeyT key;
         
+        pnode_t(const KeyT k, const data::data_t<KeyT, T>& d) : key(k), itd(d) {};
+        };
+
         struct list_t
         {
             size_t cap = 0; 
@@ -58,16 +50,18 @@ namespace caches
             };
         };
 
+        size_t csize = 0;
+
         list_t lhirs;      //part of cache for hirs elements (approximately 1% of cache size)
         list_t llirs;      //part of cache for lirs elements (approximately 99% of cache size)
-        std::unordered_multimap<KeyT, pnode_t<KeyT, T>> hashtable;
+        std::unordered_multimap<KeyT, pnode_t> hashtable;
         std::deque<KeyT> tdeque;
 
     public:
 
         lirs(const size_t sz) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
 
-        int  process_request(const data::data_t<KeyT, T> &dref);
+        bool  process_request(const data::data_t<KeyT, T> &dref);
         auto push_new_request(const data::data_t<KeyT, T> &dref);
         
         void rotate_deque_if(const KeyT k);
@@ -83,7 +77,7 @@ namespace caches
 }
 
 template <typename KeyT, typename T> 
-int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
+bool caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 {  
     if(auto it = hashtable.find(dref.key); it == hashtable.end())
     {
@@ -95,7 +89,7 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
             rotate_deque_if(ht_it->first);
             llirs.push_front(ht_it->first);
 
-            return miss;
+            return false;
         }
 
         if(lhirs.list.size() == lhirs.cap)
@@ -103,7 +97,7 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 
         lhirs.push_front(ht_it->first);
 
-        return miss;
+        return false;
     }
 
 
@@ -117,7 +111,7 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
                         llirs.push_front(ht_it->first);
                         deque_prunning();
 
-                        return hit;
+                        return true;
 
         case hirr  : //accessing hir resident element
                         rotate_deque_if(ht_it->first);
@@ -130,7 +124,7 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
                         else
                             tdeque.push_front(ht_it->first); 
 
-                        return hit;  
+                        return true;  
 
         case hirnr : //accessing hir non-resident element
                         pop_back_lhirs_element();
@@ -139,7 +133,7 @@ int caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
                         swap_hir_and_lir(ht_it->first);
                         deque_prunning();
 
-                        return miss;
+                        return false;
     }
 
     return 0;
@@ -149,7 +143,7 @@ template <typename KeyT, typename T>
 auto caches::lirs<KeyT, T>::push_new_request(const data::data_t<KeyT, T>& dref)
 {
     tdeque.push_front(dref.key);
-    pnode_t<KeyT, T> p{dref.key, dref};
+    pnode_t p{dref.key, dref};
     auto itp = hashtable.insert(std::pair{dref.key, p});
 
     return  itp;
