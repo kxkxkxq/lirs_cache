@@ -490,7 +490,7 @@ TEST(BELADYTests, Test9)
 
     enum Requests
     {
-        iterations     = 25,
+        iterations     = 100,
         nrequests      = 100000
     };
 
