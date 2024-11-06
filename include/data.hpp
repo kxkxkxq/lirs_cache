@@ -25,45 +25,37 @@ namespace data
         std::vector<data_t<KeyT, T>> requests; 
         size_t csize = 0;
         
-        void input_data();
-        void fill_requests_with_data();
-        void printf_input_data();
+        bool input_data();
     };
-
-    inline void print_nhits(const unsigned n) {std::cout << n << '\n'; };
 }
 
-template <typename KeyT, typename T> void data::Data<KeyT, T>::input_data()
+template <typename KeyT, typename T> bool data::Data<KeyT, T>::input_data()
 {
     size_t n = 0;
     std::cin >> csize >> n;
-    assert(std::cin.good());
-    
+
+    if(!std::cin.good())
+    {
+        std::cerr << "Input error\n";
+        return false;
+    }
+
     requests.reserve(n);
     
     for(size_t i = 0; i < n; ++i)
     {
         KeyT k;
         std::cin >> k;
-        assert(std::cin.good() || std::cin.eof());
+
+        if((!std::cin.good()) || (!std::cin.eof()))
+        {
+            std::cerr << "Input error\n";
+            return false;
+        }
  
-        const data_t<KeyT, T> d = requests.emplace_back(data_t<KeyT, T>{k});
-        assert(d.key == k);
+        requests.emplace_back(data_t<KeyT, T>{k});
     }
-}
-
-template <typename KeyT, typename T> void data::Data<KeyT, T>::printf_input_data()
-{
-    std::cerr << "csize == " << csize << "\nnrequests == " << requests.size() << '\n';
-    
-    for(auto i = requests.begin(); i != requests.end(); ++i)
-    {
-        const KeyT &k = i->key;
-        auto is_suitable_key = [&k] (const data_t<KeyT, T>& d) {return d.key == k; };
-
-        auto it = std::find_if(requests.begin(), requests.end(), is_suitable_key);  //write .at() for requests
-        std::cout << "requests.key == " << it->key << "\n";
-    }
+    return true;
 }
 
 #endif
