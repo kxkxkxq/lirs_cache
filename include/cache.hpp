@@ -57,11 +57,6 @@ namespace caches
         std::unordered_multimap<KeyT, pnode_t> hashtable;
         std::deque<KeyT> tdeque;
 
-    public:
-
-        lirs(const size_t sz) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
-
-        bool  process_request(const data::data_t<KeyT, T> &dref);
         auto push_new_request(const data::data_t<KeyT, T> &dref);
         
         void rotate_deque_if(const KeyT k);
@@ -70,6 +65,11 @@ namespace caches
         void swap_hir_and_lir(const KeyT hir_elem);                                     // swaps last lir  and certain hirr
         void pop_back_lhirs_element();
 
+    public:
+        
+        lirs(const size_t sz) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
+        bool process_request(const data::data_t<KeyT, T> &dref);
+        
         const size_t lhirs_cap() const {return lhirs.cap; };
         const size_t llirs_cap() const {return llirs.cap; };
     };
