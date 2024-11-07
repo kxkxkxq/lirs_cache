@@ -9,12 +9,15 @@
 int main()
 {
     data::Data<int, std::string> idata;
-    idata.input_data();
+    
+    if(!idata.input_data())
+        return 1;
+    
     caches::lirs<int, std::string> lcache{idata.csize};
 
     unsigned nhits = 0;
     for(auto i = idata.requests.begin(); i != idata.requests.end(); ++i)
         nhits += lcache.process_request(*i); 
          
-    data::print_nhits(nhits);        
+    std::cout << nhits << '\n';        
 }
