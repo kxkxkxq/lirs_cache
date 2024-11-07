@@ -194,7 +194,7 @@ TEST(LIRSTests, Test9)
 {
     enum Cache
     {
-        cache_size = 2,
+        cache_size = 1,
         req        = 1
     };
 
