@@ -57,6 +57,7 @@ namespace caches
         std::unordered_multimap<KeyT, pnode_t> hashtable;
         std::deque<KeyT> tdeque;
 
+        bool process_single_cache(const data::data_t<KeyT, T> &dref);   //case for "degenerate" cache
         auto push_new_request(const data::data_t<KeyT, T> &dref);
         
         void rotate_deque_if(const KeyT k);
@@ -73,12 +74,14 @@ namespace caches
         const size_t lhirs_cap() const {return lhirs.cap; };
         const size_t llirs_cap() const {return llirs.cap; };
     };
-
 }
 
 template <typename KeyT, typename T> 
 bool caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 {  
+    if(csize == 1)
+        return process_single_cache(dref);
+    
     if(auto it = hashtable.find(dref.key); it == hashtable.end())
     {
         auto ht_it = push_new_request(dref);
@@ -99,7 +102,6 @@ bool caches::lirs<KeyT, T>::process_request(const data::data_t<KeyT, T>& dref)
 
         return false;
     }
-
 
     auto ht_it = hashtable.find(dref.key); //ht_it == hashtable iterator to pair {KeyT, pnode_t}
     assert(ht_it != hashtable.end());
@@ -210,6 +212,29 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::swap_hir_and_li
     std::iter_swap(ith, itl);
 
     llirs.push_front(hir_elem);
+}
+
+template <typename KeyT, typename T> 
+bool caches::lirs<KeyT, T>::process_single_cache(const data::data_t<KeyT, T>& dref)
+{
+    if(hashtable.find(dref.key) == hashtable.end())
+    {
+        if(lhirs.list.size() == 0)
+        {
+            auto ht_it = push_new_request(dref);
+            lhirs.push_front(ht_it->first);
+            return false;
+        }
+
+        hashtable.erase(dref.key);
+        lhirs.list.pop_back();
+
+        auto ht_it = push_new_request(dref);
+        lhirs.push_front(ht_it->first);
+        return false;
+    }
+
+    return true;
 }
 
 #endif
