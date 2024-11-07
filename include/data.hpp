@@ -34,7 +34,7 @@ template <typename KeyT, typename T> bool data::Data<KeyT, T>::input_data()
     size_t n = 0;
     std::cin >> csize >> n;
 
-    if(!std::cin.good())
+    if(std::cin.fail())
     {
         std::cerr << "Input error\n";
         return false;
@@ -47,12 +47,12 @@ template <typename KeyT, typename T> bool data::Data<KeyT, T>::input_data()
         KeyT k;
         std::cin >> k;
 
-        if((!std::cin.good()) || (!std::cin.eof()))
+        if(std::cin.fail())
         {
             std::cerr << "Input error\n";
             return false;
         }
- 
+
         requests.emplace_back(data_t<KeyT, T>{k});
     }
     return true;
