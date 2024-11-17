@@ -11,91 +11,113 @@ namespace caches
 {
     template <typename KeyT, typename T = std::string> class belady final
     {
-        size_t                  cap = 0;
-        const std::list<KeyT>& requests;   //  list of all requests
-
+        size_t cap = 0;
+    
         using list_iter = typename std::list<KeyT>::iterator;
-        std::list<KeyT>                                   blist;  //  cache list 
-        std::unordered_multimap<KeyT, size_t>     query_indexes;    //  to find the distance between requests
-        std::unordered_multimap<KeyT, list_iter> cache_elements;   //   to check if an elem is in cache
+        std::unordered_map<KeyT, list_iter> cache_elements;
+        std::unordered_map<KeyT, std::deque<size_t>> query_indexes;
+        std::list<KeyT> cache_list;
 
-        auto find_farthest_request(const KeyT& kref);
-        void                    fill_query_indexes();
-        
+        void delete_farthest_request(const KeyT& k);
+        void fill_query_indexes(const std::list<KeyT>& r);
+
+        void erase_element(const KeyT& k);
+        KeyT& emplace_element(const KeyT& k);
+
 public :
 
-        belady(const size_t c, const std::list<KeyT>& r) : cap(c), requests(r) {fill_query_indexes();}; 
-        bool process_request(const KeyT &kref);
+        belady(const size_t c, const std::list<KeyT>& r) : cap(c) {fill_query_indexes(r); };
+        bool process_request(const KeyT& k);
     };
 }
 
-template <typename KeyT, typename T> void caches::belady<KeyT, T>::fill_query_indexes()
+template <typename KeyT, typename T> 
+void caches::belady<KeyT, T>::fill_query_indexes(const std::list<KeyT>& r)
 {
     size_t indx = 0;
-    for(auto i = requests.begin(), e = requests.end(); i != e; ++i, ++indx)
-        query_indexes.emplace(*i, indx);
+    for(auto i = r.begin(), e = r.end(); i != e; ++i, ++indx)
+    {
+        auto i_it = query_indexes.find(*i);
+    
+        if(i_it == query_indexes.end())
+            query_indexes.emplace(*i, std::deque<size_t>{indx});
+        else
+            i_it->second.emplace_back(indx);
+    }  
 }
 
 template <typename KeyT, typename T> 
-bool caches::belady<KeyT, T>::process_request(const KeyT& kref)
+bool caches::belady<KeyT, T>::process_request(const KeyT& k)
 {
-    auto i_it = query_indexes.find(kref);
+    auto i_it = query_indexes.find(k);
     assert(i_it != query_indexes.end());
-    auto c_it  = cache_elements.find(kref);
+    i_it->second.erase(i_it->second.begin());
 
-    if(c_it != cache_elements.end())
+    auto c_it = cache_elements.find(k);
+    if(c_it == cache_elements.end())
     {
-        query_indexes.erase(i_it);
-        return true;
-    }
+        if(i_it->second.empty()) return false;
     
-    if(blist.size() < cap)
-    {
-        blist.emplace_front(kref);  //  push front request "kref"
-        cache_elements.emplace(kref, blist.begin());
-        query_indexes.erase(i_it);
-
+        if(cache_list.size() < cap)
+        {
+            emplace_element(k);
+            return false;
+        }    
+        assert(cache_list.size() == cap);
+        
+        delete_farthest_request(k);
+        emplace_element(k);
         return false;
     }
 
-    auto fr_it = find_farthest_request(kref);
-    if(fr_it != blist.end())
-    {
-        auto cfr_it = cache_elements.find(*fr_it);
-        blist.erase(fr_it); //  pop back fathest request  
-        cache_elements.erase(cfr_it);
-
-        blist.emplace_front(kref);  
-        cache_elements.emplace(kref, blist.begin());
-    }
-    return false;
+    return true;
 }
 
 template <typename KeyT, typename T> 
-auto caches::belady<KeyT, T>::find_farthest_request(const KeyT& kref)
+void caches::belady<KeyT, T>::delete_farthest_request(const KeyT& k)
 {
-    auto kref_it = query_indexes.find(kref);
-    assert(kref_it != query_indexes.end());
-    size_t offset = kref_it->second;
-    
-    query_indexes.erase(kref_it);
-    if(kref_it == query_indexes.end()) return blist.end(); //  if this request is the only one
-        
-    size_t max_dist = 0;
-    auto fr_it = blist.end();
+    auto i_it = query_indexes.find(k);
+    assert(i_it != query_indexes.end());
 
-    for(auto i = blist.begin(), e = blist.end(); i != e; ++i)
+    size_t max_dist = 0;
+    auto fr_it = query_indexes.end();
+
+    //  find farthest request
+    for(auto i = cache_list.begin(), e = cache_list.end(); i != e; ++i) 
     {
         auto i_it = query_indexes.find(*i);
-        if(i_it == query_indexes.end()) return i; // if it is the last request with such key
-
-        if((i_it->second - offset) > max_dist)
+        assert(i_it != query_indexes.end());
+        
+        if(i_it->second.empty()) 
         {
-            max_dist = i_it->second;
-            fr_it = i;
+            fr_it = i_it;
+            break;
+        }
+        
+        if(i_it->second.front() > max_dist)
+        {
+            fr_it = i_it;
+            max_dist = fr_it->second.front();
         }
     }
+    //  delete it
+    erase_element(fr_it->first);
+}
 
-    assert(fr_it != blist.end());
-    return fr_it;
+template <typename KeyT, typename T> 
+void caches::belady<KeyT, T>::erase_element(const KeyT& k)
+{
+    auto c_it = cache_elements.find(k);
+    assert(c_it != cache_elements.end());
+
+    cache_list.erase(c_it->second);
+    cache_elements.erase(c_it);
+}
+
+template <typename KeyT, typename T> 
+KeyT& caches::belady<KeyT, T>::emplace_element(const KeyT& k)
+{
+    cache_list.emplace_front(k);
+    cache_elements.emplace(k, cache_list.begin());
+    return cache_list.front();
 }
