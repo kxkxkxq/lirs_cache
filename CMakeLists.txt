@@ -3,7 +3,7 @@ project("HWC")
 
 set(INCLUDE_DIR  "${CMAKE_SOURCE_DIR}/include")
 
-add_executable(lirs sourse/main.cpp)
+add_executable(lirs sourse/lirs.cpp)
 target_include_directories(lirs PUBLIC ${INCLUDE_DIR})
 
 add_executable(belady sourse/belady.cpp)
