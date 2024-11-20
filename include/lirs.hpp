@@ -18,7 +18,6 @@ namespace caches
             lir    ,    //  lir-block
             hirr   ,    //  resident hir-block
             hirnr  ,    //  non-resident hir-block
-            inv         //  invalid starus state  
         };
 
         struct list_t
@@ -32,31 +31,36 @@ namespace caches
             list_t(const size_t cs, const size_t hs) : cap(cs - hs) {};
         };
 
-        size_t          csize = 0;
-        list_t              lhirs;  //  part of cache for hirs elements (approximately 1% of cache size)
-        list_t              llirs;  //  part of cache for lirs elements (approximately 99% of cache size)
-        std::list<KeyT>    tdeque;
+        const size_t csize;
+        list_t lhirs;  //  part of cache for hirs elements (approximately 1% of cache size)
+        list_t llirs;  //  part of cache for lirs elements (approximately 99% of cache size)
+        std::list<KeyT> query_queue; 
 
-        using list_iter = typename std::list<KeyT>::iterator;
-       
-        std::unordered_map<KeyT, list_iter>    deque_check;
-        std::unordered_map<KeyT, list_iter>    cache_check;
-        std::unordered_map<KeyT, Status>    request_status;
+        struct mnode_t
+        {
+            Status status = hirr;
+            
+            using list_iter = typename std::list<KeyT>::iterator;
+            list_iter c_it; //  iterator to cache element
+            list_iter q_it; //  iterator to query queue element
 
+            mnode_t(list_iter q) : q_it(q) {};
+        };
+        std::unordered_map<KeyT, mnode_t> hashtable;  
+        
         void push_new_request(const KeyT& k);
         void swap_hir_and_lir(const KeyT& k);   //  swaps last lir  and certain hirr
         
-        void deque_pop_back();
-        void deque_push_front(const KeyT& k);
-        void rotate_deque_if(const KeyT& k);
-        void deque_prunning();
+        void rotate_queue_if(const KeyT& k);
+        void queue_push_front(const KeyT& k);
+        void queue_prunning();  // pops all unnecessary hirr and hirhr elements
 
         void list_pop_back(std::list<KeyT>& list);
         void list_push_front(std::list<KeyT>& list, const KeyT& k);
 
 public :
 
-        lirs(const size_t sz) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
+        explicit lirs(const size_t sz = 0) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
         bool process_request(const KeyT& k);
 
         void print_all();
@@ -65,73 +69,66 @@ public :
     };
 }
 
+
 template <typename KeyT, typename T> 
 bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
-{
-    static int f = 0;
-    auto rs_it = request_status.find(k);
-    if(rs_it == request_status.end())
+{  
+    auto ht_it = hashtable.find(k);
+    if(ht_it == hashtable.find(k))  //  new request
     {
         push_new_request(k);
-        auto rs_it = request_status.find(k);
+        ht_it = hashtable.find(k);
+        assert(ht_it != hashtable.end());
+        assert(ht_it->second.q_it != query_queue.end());
 
         if(llirs.list.size() < llirs.cap)
         {
-            rs_it->second = lir;
+            ht_it->second.status = lir;
             list_push_front(llirs.list, k);
             return false;
         }
 
         if(lhirs.list.size() == lhirs.cap)
             list_pop_back(lhirs.list);
-
+       
         list_push_front(lhirs.list, k);
-        return false;
-    }
-    
-    assert(rs_it != request_status.end());
-    if(rs_it->second == inv)
-    {
-        rs_it->second = hirr;
-        deque_push_front(k);
 
-        if(lhirs.list.size() == lhirs.cap)
-            list_pop_back(lhirs.list);
-
-        list_push_front(lhirs.list, k);
         return false;
     }
 
-    switch(rs_it->second)
+    assert(ht_it != hashtable.end());    
+    switch(ht_it->second.status)
     {
-        case lir   : //accessing lir element
-                        rotate_deque_if(rs_it->first);
-                        list_push_front(llirs.list, rs_it->first);
-                        deque_prunning();
-                        
+        case lir   :    //  accessing lir element
+                        rotate_queue_if(ht_it->first);
+                        list_push_front(llirs.list, ht_it->first);
+                        queue_prunning();
+
                         return true;
-
-        case hirr  : //accessing hir resident element
-                        
-                            
-                        if(deque_check.find(rs_it->first) != deque_check.end())
+        case hirr  :    //  accessing hir resident element             
+                        if(ht_it->second.q_it != query_queue.end())
                         {
-                            rotate_deque_if(rs_it->first);
-                            swap_hir_and_lir(rs_it->first);
-                            deque_prunning();
+                            rotate_queue_if(ht_it->first);
+                            swap_hir_and_lir(ht_it->first);
+                            queue_prunning();
                         }
                         else
-                            deque_push_front(rs_it->first);
+                            queue_push_front(ht_it->first);
 
-                        return true;  
-
-        case hirnr : //accessing hir non-resident element
-                        rotate_deque_if(rs_it->first);
+                        return true;
+        case hirnr :    //  accessing hir non-resident element              
                         list_pop_back(lhirs.list);
-                        list_push_front(lhirs.list, rs_it->first);
+                        list_push_front(lhirs.list, ht_it->first);
                         
-                        swap_hir_and_lir(rs_it->first);
-                        deque_prunning();
+                        if(ht_it->second.q_it == query_queue.end())
+                        {
+                            queue_push_front(ht_it->first);
+                            return false;
+                        }
+
+                        rotate_queue_if(ht_it->first);
+                        swap_hir_and_lir(ht_it->first);
+                        queue_prunning();
 
                         return false;
     }
@@ -140,113 +137,101 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
 template <typename KeyT, typename T> 
 void caches::lirs<KeyT, T>::push_new_request(const KeyT& k)
 {
-    deque_push_front(k);
-    request_status.emplace(k, hirr);
+    query_queue.push_front(k);
+    hashtable.emplace(k, query_queue.begin());
+
+    auto i = hashtable.find(k);
+    assert(i != hashtable.find(k));
+    assert(i->second.q_it == query_queue.begin());
 }
 
 template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::rotate_deque_if(const KeyT& k)
+void caches::lirs<KeyT, T>::queue_push_front(const KeyT& k)
 {
-    if(k != tdeque.front())
-    {
-        auto qc_it = deque_check.find(k);
-        tdeque.splice(tdeque.begin(), tdeque, qc_it->second);
-    }
+    auto ht_it = hashtable.find(k);
+    assert(ht_it != hashtable.end());
+    assert(ht_it->second.q_it == query_queue.end());
+
+    query_queue.push_front(ht_it->first);
+    ht_it->second.q_it = query_queue.begin(); 
+    assert(*ht_it->second.q_it == k);
 }
 
 template <typename KeyT, typename T> 
 void caches::lirs<KeyT, T>::list_push_front(std::list<KeyT>& list, const KeyT& k)
 {
-    auto cc_it = cache_check.find(k);
+    auto ht_it = hashtable.find(k);
+    assert(ht_it != hashtable.end());
 
-    if(cc_it != cache_check.end())
-    {
-        if(cc_it->second == list.end())
-        {
-            auto rs_it = request_status.find(k);
-            rs_it->second = hirr;
-            list.emplace_front(k);
-            cc_it->second = list.begin();
-        }
-        else
-            list.splice(list.begin(), list, cc_it->second);
+    if(ht_it->second.c_it == lhirs.list.end())  //  c_it == lhirs.list.end() means 
+    {                                           //  there's no key k in cache 
+        list.push_front(k);
+        ht_it->second.c_it = list.begin();
+        assert(ht_it->second.c_it != list.end());
     }
     else
-    {
-        list.emplace_front(k);
-        cache_check.emplace(k, list.begin());
-    }
+        list.splice(list.begin(), list, ht_it->second.c_it);
 }
 
 template <typename KeyT, typename T> 
 void caches::lirs<KeyT, T>::list_pop_back(std::list<KeyT>& list)
 {
-    auto rs_it = request_status.find(list.back());
-    rs_it->second = hirnr;
-    
-    auto cc_it = cache_check.find(list.back());
-    list.erase(cc_it->second);
-    cc_it->second = list.end();  
+    auto ht_it = hashtable.find(list.back());
+    assert(ht_it != hashtable.end());
+    assert(ht_it->second.c_it != lhirs.list.end());
+
+    ht_it->second.status = hirnr;
+    list.pop_back();
+    ht_it->second.c_it = lhirs.list.end();  
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::deque_prunning()
+template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_queue_if(const KeyT& k)
 {
-    for(auto q_it = tdeque.rbegin(), e = tdeque.rend(); q_it != e; )  //  there was "itq = tdeque.begin()"
+    if(k != query_queue.front())
     {
-        auto rs_it = request_status.find(*q_it);
-        assert(rs_it != request_status.end());
+        auto ht_it = hashtable.find(k);
+        assert(ht_it != hashtable.end());
+        assert(ht_it->second.q_it != query_queue.end());
+        query_queue.splice(query_queue.begin(), query_queue, ht_it->second.q_it); 
+    }
+}
 
-        switch(rs_it->second)
+template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning()
+{
+    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e; ++i) //there was "itq = tdeque.begin()"
+    {
+        assert(i != e);
+        auto ht_it = hashtable.find(*i);
+        assert(ht_it != hashtable.end());
+        assert(ht_it->first == *i);
+        assert(ht_it->second.q_it != query_queue.end());
+
+        switch(ht_it->second.status)
         {
             case lir   :
                             return;
-
             case hirr  :    
-                            deque_pop_back();
-                            break;
             case hirnr :  
-                            if(rs_it->second != inv)
-                            {
-                                rs_it->second = inv;
-                                deque_pop_back();
-                                cache_check.erase(rs_it->first);
-                                break;
-                            }
-                            else   
-                                request_status.erase(rs_it);
-                                break;
+                            query_queue.pop_back();
+                            ht_it->second.q_it = query_queue.end();
+                            break;
         }
     }
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::deque_pop_back()
+template <typename KeyT, typename T> void caches::lirs<KeyT, T>::swap_hir_and_lir(const KeyT& k)
 {
-    auto qc_it = deque_check.find(tdeque.back());
-    tdeque.erase(qc_it->second);
-    deque_check.erase(qc_it);
-}
+    auto ht_ith = hashtable.find(k);
+    auto ht_itl = hashtable.find(llirs.list.back());
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::deque_push_front(const KeyT& k)
-{
-    tdeque.emplace_front(k);
-    deque_check.emplace(k, tdeque.begin());
-}
-
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::swap_hir_and_lir(const KeyT& k)
-{
-    auto rs_ith = request_status.find(k);
-    auto rs_itl = request_status.find(llirs.list.back());
+    assert(ht_ith != hashtable.end());
+    assert(ht_itl != hashtable.end());
+    assert(ht_ith->second.c_it != lhirs.list.end());
+    assert(ht_itl->second.c_it != lhirs.list.end());
     
-    rs_ith->second = lir;
-    rs_itl->second = hirr;
+    ht_ith->second.status = lir;
+    ht_itl->second.status = hirr;
 
-    auto cc_ith = cache_check.find(k);
-    auto cc_itl = cache_check.find(llirs.list.back());
-
-    llirs.list.splice(llirs.list.begin(), lhirs.list, cc_ith->second);
-    lhirs.list.splice(lhirs.list.begin(), llirs.list, cc_itl->second);
+    llirs.list.splice(llirs.list.begin(), lhirs.list, ht_ith->second.c_it);
+    lhirs.list.splice(lhirs.list.begin(), llirs.list, ht_itl->second.c_it);
 }
