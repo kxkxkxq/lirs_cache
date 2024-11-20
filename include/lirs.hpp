@@ -63,12 +63,10 @@ public :
         explicit lirs(const size_t sz = 0) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
         bool process_request(const KeyT& k);
 
-        void print_all();
         const size_t lhirs_cap() const {return lhirs.cap; };
         const size_t llirs_cap() const {return llirs.cap; };
     };
 }
-
 
 template <typename KeyT, typename T> 
 bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
