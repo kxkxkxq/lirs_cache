@@ -70,9 +70,9 @@ public :
 
 template <typename KeyT, typename T> 
 bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
-{  
+{     
     auto ht_it = hashtable.find(k);
-    if(ht_it == hashtable.find(k))  //  new request
+    if(ht_it == hashtable.end())  //  new request
     {
         push_new_request(k);
         ht_it = hashtable.find(k);
@@ -137,10 +137,12 @@ void caches::lirs<KeyT, T>::push_new_request(const KeyT& k)
 {
     query_queue.push_front(k);
     hashtable.emplace(k, query_queue.begin());
-
+    
     auto i = hashtable.find(k);
-    assert(i != hashtable.find(k));
-    assert(i->second.q_it == query_queue.begin());
+    assert(i != hashtable.end());
+    assert(*i->second.q_it == query_queue.front());
+    i->second.c_it = lhirs.list.end();  //  c_it == lhirs.list.end() means
+                                        //  there's no key k in cache 
 }
 
 template <typename KeyT, typename T> 
@@ -161,8 +163,8 @@ void caches::lirs<KeyT, T>::list_push_front(std::list<KeyT>& list, const KeyT& k
     auto ht_it = hashtable.find(k);
     assert(ht_it != hashtable.end());
 
-    if(ht_it->second.c_it == lhirs.list.end())  //  c_it == lhirs.list.end() means 
-    {                                           //  there's no key k in cache 
+    if(ht_it->second.c_it == lhirs.list.end())  
+    {                                           
         list.push_front(k);
         ht_it->second.c_it = list.begin();
         assert(ht_it->second.c_it != list.end());
@@ -196,7 +198,7 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_queue_if
 
 template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning()
 {
-    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e; ++i) //there was "itq = tdeque.begin()"
+    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e;) //there was "itq = tdeque.begin()"
     {
         assert(i != e);
         auto ht_it = hashtable.find(*i);
