@@ -20,7 +20,6 @@ int main()
     }
 
     caches::lirs<int> lcache{size};
-                            //  add check that csize != 1
     unsigned nhits = 0;
     for(unsigned i = 0; i < nrequests; ++i)
     {
