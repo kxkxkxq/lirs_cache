@@ -6,6 +6,7 @@ data = np.loadtxt('results.txt')
 belady_hits = data[:, 0]
 lirs_hits   = data[:, 1]
 nrequests   = data[:, 2]
+cache_size  = data[:, 3]
 
 i = np.arange(len(belady_hits))
 
@@ -25,11 +26,12 @@ for bar in lirs:
     y = bar.get_height()
     plt.text(bar.get_x() + (bar.get_width() / 2), y + 0.5, int(y), ha = 'center', va = 'bottom', fontsize = 9)
 
-n = nrequests[0]
+n  = nrequests[0]
+c = cache_size[0]
 
 plt.xlabel('Test number')
 plt.ylabel('Hits')
-plt.title(f'Comparison of Belady and LIRS cache algorithms (for {int(n)} requests)')
+plt.title(f'Comparison of Belady and LIRS cache algorithms (for {int(n)} requests with cache size {int(c)})')
 
 plt.savefig('bar_chart.png')
 
