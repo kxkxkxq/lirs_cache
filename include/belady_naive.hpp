@@ -86,9 +86,12 @@ template <typename KeyT, typename T> auto caches::belady<KeyT, T>::find_farthest
 {
     auto it = hashtable.find(req);
     assert(it != hashtable.end());
+    if(hashtable.count(req) == 0) return blist.end(); 
+    
+    
     size_t offset = it->second;
     
-    size_t max_dist = 0;
+    size_t max_dist = ;
     auto m_it = blist.end();
 
     for(auto i = blist.begin(), e = blist.end(); i != e; ++i)

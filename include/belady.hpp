@@ -18,7 +18,7 @@ namespace caches
         std::unordered_map<KeyT, std::deque<size_t>> query_indexes;
         std::list<KeyT> cache_list;
 
-        void delete_farthest_request(const KeyT& k);
+        void delete_farthest_request(const KeyT& k);  //  finds and deletes element that will not be uset for a long time
         void fill_query_indexes(const std::list<KeyT>& r);
 
         void erase_element(const KeyT& k);

@@ -15,9 +15,9 @@ namespace caches
     {
         enum Status
         {
-            lir    ,    //  lir-block
-            hirr   ,    //  resident hir-block
-            hirnr  ,    //  non-resident hir-block
+            lir    ,    //  lir element
+            hirr   ,    //  resident hir element
+            hirnr  ,    //  non-resident hir element
         };
 
         struct list_t
@@ -27,8 +27,8 @@ namespace caches
 
             enum Csizes {hsize = 1, lsize = 99 };   //  percentage of hirs and lirs lists sizes 
             
-            list_t(const size_t cs) : cap((cs * hsize / 100) + 1) {};
-            list_t(const size_t cs, const size_t hs) : cap(cs - hs) {};
+            list_t(const size_t cs) : cap((cs * hsize / 100) + 1) {};   //  ctor for lhirs
+            list_t(const size_t cs, const size_t hs) : cap(cs - hs) {}; //  ctor for llirs
         };
 
         const size_t csize;
@@ -48,10 +48,10 @@ namespace caches
         };
         std::unordered_map<KeyT, mnode_t> hashtable;  
         
-        void push_new_request(const KeyT& k);
+        void push_new_request(const KeyT& k);   //  pushes new request to query_queue and hashtable
         void swap_hir_and_lir(const KeyT& k);   //  swaps last lir  and certain hirr
         
-        void rotate_queue_if(const KeyT& k);
+        void rotate_queue_if(const KeyT& k);    //  move certain element to the beginning of the query_queue 
         void queue_push_front(const KeyT& k);
         void queue_prunning();  // pops all unnecessary hirr and hirhr elements
 
@@ -90,7 +90,6 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
             list_pop_back(lhirs.list);
        
         list_push_front(lhirs.list, k);
-
         return false;
     }
 
@@ -101,7 +100,6 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
                         rotate_queue_if(ht_it->first);
                         list_push_front(llirs.list, ht_it->first);
                         queue_prunning();
-
                         return true;
         case hirr  :    //  accessing hir resident element             
                         if(ht_it->second.q_it != query_queue.end())
@@ -112,7 +110,6 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
                         }
                         else
                             queue_push_front(ht_it->first);
-
                         return true;
         case hirnr :    //  accessing hir non-resident element              
                         list_pop_back(lhirs.list);
@@ -127,7 +124,6 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
                         rotate_queue_if(ht_it->first);
                         swap_hir_and_lir(ht_it->first);
                         queue_prunning();
-
                         return false;
     }
 }
@@ -198,7 +194,7 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_queue_if
 
 template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning()
 {
-    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e;) //there was "itq = tdeque.begin()"
+    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e; ) 
     {
         assert(i != e);
         auto ht_it = hashtable.find(*i);
@@ -222,6 +218,7 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning(
 template <typename KeyT, typename T> void caches::lirs<KeyT, T>::swap_hir_and_lir(const KeyT& k)
 {
     auto ht_ith = hashtable.find(k);
+    assert(!llirs.list.empty());
     auto ht_itl = hashtable.find(llirs.list.back());
 
     assert(ht_ith != hashtable.end());
