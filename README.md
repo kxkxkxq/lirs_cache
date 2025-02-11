@@ -1,6 +1,6 @@
 # caches
 Here are presented two implementations of caching aigorithms - [LIRS caching algorithm](https://en.wikipedia.org/wiki/LIRS_caching_algorithm) 
-and the [Belady algorithm](https://en.wikipedia.org/wiki/Cache_replacement_policies)
+and the [Belady's algorithm](https://en.wikipedia.org/wiki/Cache_replacement_policies)
 
 ## How to install
 use 
