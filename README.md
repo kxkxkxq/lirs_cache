@@ -5,7 +5,7 @@ and the [Belady's algorithm](https://en.wikipedia.org/wiki/Cache_replacement_pol
 ## How to install
 use 
 ```bush
-git clone git@github:.com:kxkxkxq/caches.git
+git clone git@github.com:kxkxkxq/caches.git
 ``` 
 and then 
 ```bush
@@ -33,5 +33,5 @@ to run Belady's algorithm use
 ```
 to run tests use 
 ```bush
-./build/tests/test
+./build/tests/tests
 ```
