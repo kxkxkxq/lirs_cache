@@ -35,14 +35,16 @@ template <typename KeyT, typename T>
 void caches::belady<KeyT, T>::fill_query_indexes(const std::list<KeyT>& r)
 {
     size_t indx = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i, ++indx)
+    for(auto i : r)
     {
-        auto i_it = query_indexes.find(*i);
+        auto i_it = query_indexes.find(i);
     
         if(i_it == query_indexes.end())
-            query_indexes.emplace(*i, std::deque<size_t>{indx});
+            query_indexes.emplace(i, std::deque<size_t>{indx});
         else
             i_it->second.emplace_back(indx);
+        
+        ++indx;
     }  
 }
 
@@ -83,9 +85,9 @@ void caches::belady<KeyT, T>::delete_farthest_request(const KeyT& k)
     auto fr_it = query_indexes.end();
 
     //  find farthest request
-    for(auto i = cache_list.begin(), e = cache_list.end(); i != e; ++i) 
+    for(auto i : cache_list) 
     {
-        auto i_it = query_indexes.find(*i);
+        auto i_it = query_indexes.find(i);
         assert(i_it != query_indexes.end());
         
         if(i_it->second.empty()) 

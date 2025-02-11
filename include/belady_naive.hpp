@@ -64,34 +64,28 @@ bool caches::belady<KeyT, T>::process_request(const data::data_t<KeyT, T> &dref)
 
         auto de_it = find_farthest_request(ht_it->first);
         
-        blist.erase(de_it);
-        blist.push_front(ht_it->first);
+        if(de_it != blist.end())
+        {
+            blist.erase(de_it);
+            blist.push_front(ht_it->first);
+        }
+        
         hashtable.erase(ht_it);
-
         return false;
-
     }
 
-    else
-    {
-        rotate_blist_if(ht_it->first);
-        hashtable.erase(ht_it);
-        return true;
-    }
-
-    return 0;
+    rotate_blist_if(ht_it->first);
+    hashtable.erase(ht_it);
+    return true;
 }
 
 template <typename KeyT, typename T> auto caches::belady<KeyT, T>::find_farthest_request(const KeyT& req)
 {
     auto it = hashtable.find(req);
-    assert(it != hashtable.end());
-    if(hashtable.count(req) == 0) return blist.end(); 
-    
-    
     size_t offset = it->second;
+    if(hashtable.count(req) == 1) return blist.end(); 
     
-    size_t max_dist = ;
+    size_t max_dist = 0;
     auto m_it = blist.end();
 
     for(auto i = blist.begin(), e = blist.end(); i != e; ++i)

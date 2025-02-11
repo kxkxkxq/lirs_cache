@@ -22,7 +22,7 @@ namespace caches
 
         struct list_t
         {
-            size_t cap = 0; 
+            const size_t cap = 0; 
             std::list<KeyT> list;
 
             enum Csizes {hsize = 1, lsize = 99 };   //  percentage of hirs and lirs lists sizes 
@@ -102,11 +102,11 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
                         queue_prunning();
                         return true;
         case hirr  :    //  accessing hir resident element             
-                        if(ht_it->second.q_it != query_queue.end())
+                        if(ht_it->second.q_it != query_queue.end()) 
                         {
-                            rotate_queue_if(ht_it->first);
-                            swap_hir_and_lir(ht_it->first);
-                            queue_prunning();
+                            rotate_queue_if(ht_it->first);  //  if resident hir element 
+                            swap_hir_and_lir(ht_it->first); //  was not in query queue
+                            queue_prunning();               //  it remains in this status
                         }
                         else
                             queue_push_front(ht_it->first);
@@ -126,6 +126,7 @@ bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
                         queue_prunning();
                         return false;
     }
+    return false;
 }
 
 template <typename KeyT, typename T> 
@@ -194,12 +195,11 @@ template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_queue_if
 
 template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning()
 {
-    for(auto i = query_queue.rbegin(), e = query_queue.rend(); i != e; ) 
+    for(auto i : query_queue) 
     {
-        assert(i != e);
-        auto ht_it = hashtable.find(*i);
+        auto ht_it = hashtable.find(i);
         assert(ht_it != hashtable.end());
-        assert(ht_it->first == *i);
+        assert(ht_it->first == i);
         assert(ht_it->second.q_it != query_queue.end());
 
         switch(ht_it->second.status)
