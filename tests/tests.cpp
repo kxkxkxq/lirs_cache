@@ -3,506 +3,182 @@
 #include <iostream>
 #include <random>
 
-#include "../include/lirs.hpp"
-#include "../include/belady.hpp"
+#include "lirs.hpp"
+#include "belady.hpp"
+
+namespace cachetests
+{
+//      structs for tests :    
+    struct CacheHitParam 
+    {
+        size_t cacheSize;    
+        const std::list<int> testData;  
+        unsigned result;
+    };
+
+    struct CacheBigDataParam
+    {
+        size_t cacheSize;
+        size_t testDataSize;
+        size_t numberOfIterations;  //  number of repeated tests for given data 
+    };
+
+//     HIT TEST DATA
+    static std::list<int>  l1(10, 1);
+    static std::list<int>  l2(1000000, 1);
+    static std::list<int>  l3{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    static std::list<int>  l4{1, 2, 3, 4, 5, 4, 6, 4, 6, 6};
+    static std::list<int>  l5{1, 2, 3, 4, 1, 2, 3, 4, 1, 2};
+    static std::list<int>  l6{1, 2, 3, 4, 3, 3, 3, 3, 3, 3};
+    static std::list<int>  l7{1, 3, 1, 3, 1, 3, 1, 3, 1, 3};
+    static std::list<int>  l8{1, 2, 3, 4, 5, 2, 1, 1, 2, 4, 3, 4};
+
+    std::vector<CacheHitParam> lirsHitTestData = 
+    {
+        {10, l1, 9},
+        { 2, l2, 999999},
+        { 3, l3, 0},
+        { 4, l4, 3},
+        {10, l5, 6},
+        {10, l6, 6},
+        { 2, l7, 8},
+        { 4, l8, 6}
+    };
+
+    std::vector<CacheHitParam> beladyHitTestData = 
+    {
+        {10, l1, 9},
+        { 2, l2, 999999},
+        { 3, l3, 0},
+        { 4, l4, 4},
+        {10, l5, 6},
+        {10, l6, 6},
+        { 2, l7, 8},
+        { 4, l8, 7}   
+    };
+
+//      TESTS WITH BIG PSEUDORANDOM DATA 
+    std::vector<CacheBigDataParam> bigTestData = 
+    {
+        {50, 1000, 10},
+        {1000, 10000, 10},
+        {5000, 100000, 10},
+        {25000, 1000000, 10},
+        {1000, 1000000, 10}, 
+    };
+
+    std::vector<CacheBigDataParam> beladyBigTestData = 
+    {
+        {50, 1000, 10},
+        {10, 100000, 50},
+        {5000, 100000, 10},
+        {250000, 1000000, 100}, 
+        {25000, 1000000, 10}
+    };
+
+//      func to fill list with pseudorandom numbers
+    template <typename KeyT> void   
+    fill_list_with_data(std::list<KeyT>& l, size_t size, const KeyT lb = 1, const KeyT ub = 10000)
+    {
+        std::random_device r;
+        std::mt19937 gen(r());    
+        std::uniform_int_distribution<> req_dist{lb, ub};
+
+        for (size_t i = 0; i < size; ++i)
+            l.push_back(req_dist(gen));
+    };
+}   //  namespace
+
+
+//      CACHE HIT TESTS
+class LIRSHitTests : public ::testing::TestWithParam<cachetests::CacheHitParam> {};
+class BeladyHitTests : public ::testing::TestWithParam<cachetests::CacheHitParam> {};
 
 //  LIRS
-TEST(LIRSTests, Test1)
+TEST_P(LIRSHitTests, HitTest)
 {
-    caches::lirs<int> tcache{0};
-    unsigned nhits = 0;
-    nhits += tcache.process_request(0);
+    cachetests::CacheHitParam testParams = GetParam();
+    caches::lirs<int> cache{testParams.cacheSize};
 
-    EXPECT_EQ(nhits, 0);
+    unsigned nh = 0;
+    for(auto i : testParams.testData)
+        nh += cache.process_request(i);
+    EXPECT_EQ(nh, testParams.result);
 }
 
-TEST(LIRSTests, Test2)
+//  Belady
+TEST_P(BeladyHitTests, HitTest)
 {
-    enum Cache
-    { 
-        cache_size = 10
-    };
+    cachetests::CacheHitParam testParams = GetParam();
+    caches::belady<int> cache{testParams.cacheSize, testParams.testData};
 
-    enum Requests
-    {
-        req            = 1,
-        expected_nhits = 9,
-        nrequests      = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-
-    unsigned nhits = 0;
-    for(size_t i = 0; i < nrequests; ++i)
-        nhits += tcache.process_request(req);
-
-    EXPECT_EQ(nhits, expected_nhits);
+    unsigned nh = 0;
+    for(auto i : testParams.testData)
+        nh += cache.process_request(i);
+    EXPECT_EQ(nh, testParams.result);
 }
 
-TEST(LIRSTests, Test3)
+INSTANTIATE_TEST_SUITE_P( LIRS,
+                          LIRSHitTests,
+                          ::testing::ValuesIn(cachetests::lirsHitTestData) );
+
+INSTANTIATE_TEST_SUITE_P( Belady,
+                          BeladyHitTests,
+                          ::testing::ValuesIn(cachetests::beladyHitTestData) );
+
+
+//      BIG DATA TESTS
+class LIRSBigDataTests : public ::testing::TestWithParam<cachetests::CacheBigDataParam> {};
+class BeladyBigDataTests : public ::testing::TestWithParam<cachetests::CacheBigDataParam> {};
+
+//  LIRS
+TEST_P(LIRSBigDataTests, BigDataTest)
 {
-    enum Cache
+    cachetests::CacheBigDataParam testParams = GetParam();
+    
+    for(size_t i = 0; i < testParams.numberOfIterations; ++i)
     {
-        hirs_size  = 1, 
-        lirs_size  = 2, 
-        cache_size = 3
-    };
-
-    enum Requests
-    {
-        expected_nhits = 0,
-        nrequests     = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    ASSERT_EQ(tcache.lhirs_cap(), hirs_size);
-    ASSERT_EQ(tcache.llirs_cap(), lirs_size);
-
-    unsigned nhits = 0;
-    for(int i = 0; i < nrequests; ++i)
-        nhits += tcache.process_request(i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(LIRSTests, Test4)
-{
-    enum Cache
-    {
-        cache_size = 4
-    };
-
-    enum Requests
-    {
-        expected_nhits = 3,
-        nrequests = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    std::vector<int> r = {1, 2, 3, 4, 5, 4, 6, 4, 6, 6};
-
-    unsigned nhits = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-
-}
-
-TEST(LIRSTests, Test5)
-{
-    enum Cache
-    {
-        cache_size = 10
-    };
-
-    enum Requests
-    {
-        expected_nhits = 6,
-        nrequests = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    std::vector<int> r = {1, 2, 3, 4, 1, 2, 3, 4, 1, 2};
-
-    unsigned nhits = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-
-}
-
-TEST(LIRSTests, Test6)
-{
-    enum Cache
-    {
-        cache_size = 10
-    };   
-
-    enum Requests
-    {
-        expected_nhits = 6,
-        nrequests      = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    std::vector<int> r = {1, 2, 3, 4, 3, 3, 3, 3, 3, 3};
-
-    unsigned nhits = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(LIRSTests, Test7)
-{
-    enum Cache
-    {
-        cache_size = 2
-    };
-
-    enum Requests
-    {
-        expected_nhits = 8,
-        nrequests      = 10
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    std::vector<int> r = {1, 3, 1, 3, 1, 3, 1, 3, 1, 3};
-
-    unsigned nhits = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-TEST(LIRSTests, Test8)
-{   
-    enum Cache
-    {
-        cache_size = 4
-    };
-
-    enum Requests
-    {
-        expected_nhits = 6,
-        nrequests      = 12
-    };
-
-    caches::lirs<int> tcache{cache_size};
-    std::vector<int> r = {1, 2, 3, 4, 5, 2, 1, 1, 2, 4, 3, 4};
-
-    unsigned nhits = 0;
-    for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(LIRSTests, Test9)
-{
-    enum Cache
-    {
-        cache_size = 2
-    };
-
-    enum Requests
-    {
-        expected_nhits = 99999,
-        nrequests      = 100000
-    };
-
-    caches::lirs<int> tcache{cache_size};
-
-    unsigned nhits = 0;
-    for(size_t i = 0; i < nrequests; ++i)
-        nhits += tcache.process_request(1);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(LIRSTests, Test10)
-{
-    enum Cache
-    {
-        cache_size = 10,
-    };
-
-    enum Requests
-    {
-        iterations     = 100,
-        nrequests      = 100000
-    };
-
-    for(unsigned it = 0; it < iterations; ++it)
-    {
-        caches::lirs<int> tcache{cache_size};
-        std::vector<int> r;
-        r.reserve(nrequests);
-
-        std::random_device rd;
-        std::mt19937 gen(rd());    
-        std::uniform_int_distribution<> req_dist{1, 10000};
-
-        for(unsigned i = 0; i < nrequests; ++i)
+        std::unique_ptr<std::list<int>> dataPtr(new std::list<int>);
+        cachetests::fill_list_with_data(*dataPtr, testParams.testDataSize);
+        
+        caches::lirs<int> cache{testParams.cacheSize};
+        unsigned ni = 0;
+        
+        for(auto j : *dataPtr)
         {
-            int k = req_dist(gen);
-            r.emplace_back(k);
+            cache.process_request(j);
+            ++ni;
         }
-
-        unsigned niterations = 0;
-        for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        {
-            tcache.process_request(*i);
-            ++niterations;
-        }
-
-        EXPECT_EQ(niterations, nrequests);
-    }    
-}
-
-TEST(LIRSTests, Test11)
-{
-    enum Cache
-    {
-        cache_size = 250000,
-    };
-
-    enum Requests
-    {
-        iterations     = 100,
-        nrequests      = 1000000
-    };
-
-    for(unsigned it = 0; it < iterations; ++it)
-    {
-        caches::lirs<int> tcache{cache_size};
-        std::vector<int> r;
-        r.reserve(nrequests);
-
-        std::random_device rd;
-        std::mt19937 gen(rd());    
-        std::uniform_int_distribution<> req_dist{1, 10000};
-
-        for(unsigned i = 0; i < nrequests; ++i)
-        {
-            int k = req_dist(gen);
-            r.emplace_back(k);
-        }
-
-        unsigned niterations = 0;
-        for(auto i = r.begin(), e = r.end(); i != e; ++i)
-        {
-            tcache.process_request(*i);
-            ++niterations;
-        }
-
-        EXPECT_EQ(niterations, nrequests); 
+        EXPECT_EQ(ni, testParams.testDataSize);
     }
 }
 
-//  BELADY
-
-TEST(BELADYTests, Test1)
+//  Belady
+TEST_P(BeladyBigDataTests, BigDataTest)
 {
-    std::list<int> l = {0};
-    caches::belady<int> tcache{0, l};
-    unsigned nhits = 0;
-    nhits += tcache.process_request(0);
-
-    EXPECT_EQ(nhits, 0);
-}
-
-TEST(BELADYTests, Test2)
-{
-    enum Cache
-    { 
-        cache_size = 10
-    };
-
-    enum Requests
+    cachetests::CacheBigDataParam testParams = GetParam();
+    
+    for(size_t i = 0; i < testParams.numberOfIterations; ++i)
     {
-        expected_nhits = 9
-    };
-
-    std::list<int> l = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test3)
-{
-    enum Cache
-    {
-        cache_size = 3
-    };
-
-    enum Requests
-    {
-        expected_nhits = 0
-    };
-
-    std::list<int> l = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0};
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test4)
-{
-    enum Cache
-    {
-        cache_size = 4
-    };
-
-    enum Requests
-    {
-        expected_nhits = 6
-    };
-
-    std::list<int> l = {1, 2, 3, 4, 1, 2, 3, 4, 1, 2};
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test5)
-{
-    enum Cache
-    {
-        cache_size = 2
-    };
-
-    enum Requests
-    {
-        expected_nhits = 8
-    };
-
-    std::list l = {1, 3, 1, 3, 1, 3, 1, 3, 1, 3};
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test6)
-{   
-    enum Cache
-    {
-        cache_size = 4
-    };
-
-    enum Requests
-    {
-        expected_nhits = 7
-    };
-
-    std::list l = {1, 2, 3, 4, 5, 2, 1, 1, 2, 4, 3, 4};
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test7)
-{
-    enum Cache
-    {
-        cache_size = 2,
-        req        = 1
-    };
-
-    enum Requests
-    {
-        expected_nhits = 99999,
-        nrequests      = 100000
-    };
-
-    std::list<int> l(nrequests, req);
-    caches::belady<int> tcache{cache_size, l};
-
-    unsigned nhits = 0;
-    for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        nhits += tcache.process_request(*i);
-
-    EXPECT_EQ(nhits, expected_nhits);
-}
-
-TEST(BELADYTests, Test8)
-{
-    enum Cache
-    {
-        cache_size = 10,
-    };
-
-    enum Requests
-    {
-        iterations     = 50,
-        nrequests      = 100000
-    };
-
-    for(unsigned it = 0; it < iterations; ++it)
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());    
-        std::uniform_int_distribution<> req_dist{1, 10000};
-
-        std::list<int> l;
-        for(unsigned i = 0; i < nrequests; ++i)
+        std::unique_ptr<std::list<int>> dataPtr(new std::list<int>);
+        cachetests::fill_list_with_data(*dataPtr, testParams.testDataSize);
+        
+        caches::belady<int> cache{testParams.cacheSize, *dataPtr};
+        unsigned ni = 0;
+        
+        for(auto j : *dataPtr)
         {
-            int k = req_dist(gen);
-            l.emplace_back(k);
+            cache.process_request(j);
+            ++ni;
         }
-
-        caches::belady<int, std::string> tcache{cache_size, l};
-
-        unsigned niterations = 0;
-        for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        {
-            tcache.process_request(*i);
-            ++niterations;
-        }
-
-        EXPECT_EQ(niterations, nrequests);
-    }    
+        EXPECT_EQ(ni, testParams.testDataSize);
+    }
 }
 
-TEST(BELADYTests, Test9)
-{
-    enum Cache
-    {
-        cache_size = 250000,
-    };
+INSTANTIATE_TEST_SUITE_P( LIRS,
+                          LIRSBigDataTests,
+                          ::testing::ValuesIn(cachetests::bigTestData) );
 
-    enum Requests
-    {
-        iterations     = 100,
-        nrequests      = 1000000
-    };
-
-    for(unsigned it = 0; it < iterations; ++it)
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());    
-        std::uniform_int_distribution<> req_dist{1, 10000};
-
-        std::list<int> l;
-        for(unsigned i = 0; i < nrequests; ++i)
-        {
-            int k = req_dist(gen);
-            l.emplace_back(k);
-        }
-
-        caches::belady<int, std::string> tcache{cache_size, l};
-
-        unsigned niterations = 0;
-        for(auto i = l.begin(), e = l.end(); i != e; ++i)
-        {
-            tcache.process_request(*i);
-            ++niterations;
-        }
-
-        EXPECT_EQ(niterations, nrequests);
-    }   
-}
+INSTANTIATE_TEST_SUITE_P( Belady,
+                          BeladyBigDataTests,
+                          ::testing::ValuesIn(cachetests::beladyBigTestData) );
