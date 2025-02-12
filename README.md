@@ -2,6 +2,21 @@
 Here are presented two implementations of caching aigorithms - [LIRS caching algorithm](https://en.wikipedia.org/wiki/LIRS_caching_algorithm) 
 and the [Belady's algorithm](https://en.wikipedia.org/wiki/Cache_replacement_policies)
 
+## Short description 
+For each realisation 
+
+### Input
+On stdin : cache size,  number of elements, then the elements themselves
+
+### Output
+On stdout : the number of cache hits
+
+### Example (for Belady's algoritm)
+Input : 10, 10 , 1, 2, 3, 4, 1, 2, 3, 4, 1, 2
+
+Output : 6
+
+
 ## How to install
 use 
 ```bush
