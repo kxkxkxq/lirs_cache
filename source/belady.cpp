@@ -7,32 +7,32 @@
 
 int main()
 {
-    long long size = 0, nrequests = 0;
-    std::cin >> size >> nrequests;
+    long long size = 0, nRequests = 0;
+    std::cin >> size >> nRequests;
     
-    if(std::cin.fail() || (size < 0) || (nrequests < 0))
+    if(std::cin.fail() || (size < 0) || (nRequests < 0))
     {
         std::cerr << "Input error\n";
         return 1;
     }
     
     std::list<int> requests;
-    for(unsigned i = 0; i < nrequests; ++i)
+    for(unsigned i = 0; i < nRequests; ++i)
     {
-        int k = 0;
-        std::cin >> k;
+        int key = 0;
+        std::cin >> key;
         if(std::cin.fail())
         {
             std::cerr << "Input error\n";
             return 1;
         }
-        requests.push_back(k);
+        requests.push_back(key);
     }
 
-    caches::belady<int> bcache(size, requests);
-    unsigned nhits = 0;
+    caches::belady<int> bCache(size, requests.begin(), requests.end());
+    unsigned nHits = 0;
     for(auto i : requests)
-        nhits += bcache.process_request(i);
+        nHits += bCache.process_request(i);
 
-    std::cout << nhits << '\n';
+    std::cout << nHits << '\n';
 }

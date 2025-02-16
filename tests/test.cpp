@@ -110,7 +110,9 @@ TEST_P(LIRSHitTests, HitTest)
 TEST_P(BeladyHitTests, HitTest)
 {
     cachetests::CacheHitParam testParams = GetParam();
-    caches::belady<int> cache{testParams.cacheSize, testParams.testData};
+    caches::belady<int> cache{  testParams.cacheSize, 
+                                testParams.testData.begin(),
+                                testParams.testData.end()};
 
     unsigned nh = 0;
     for(auto i : testParams.testData)
@@ -163,7 +165,9 @@ TEST_P(BeladyBigDataTests, BigDataTest)
         std::unique_ptr<std::list<int>> dataPtr(new std::list<int>);
         cachetests::fill_list_with_data(*dataPtr, testParams.testDataSize);
         
-        caches::belady<int> cache{testParams.cacheSize, *dataPtr};
+        caches::belady<int> cache{  testParams.cacheSize, 
+                                    dataPtr->begin(),
+                                    dataPtr->end()};
         unsigned ni = 0;
         
         for(auto j : *dataPtr)

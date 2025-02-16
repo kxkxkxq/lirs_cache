@@ -11,38 +11,44 @@ namespace caches
 {
     template <typename KeyT, typename T = std::string> class belady final
     {
-        size_t cap = 0;
+        const size_t capacity = 0;
     
-        using list_iter = typename std::list<KeyT>::iterator;
-        std::unordered_map<KeyT, list_iter> cache_elements;
-        std::unordered_map<KeyT, std::deque<size_t>> query_indexes;
-        std::list<KeyT> cache_list;
+        using listIter = typename std::list<KeyT>::iterator;
+        std::unordered_map<KeyT, listIter> cacheElements;
+        std::unordered_map<KeyT, std::deque<size_t>> queryIndexes;
+        std::list<KeyT> cacheList;
 
-        void delete_farthest_request(const KeyT& k);  //  finds and deletes element that will not be uset for a long time
-        void fill_query_indexes(const std::list<KeyT>& r);
-
+        template <typename Iter>
+        void fill_query_indexes(const Iter begin, const Iter end);
+        
         void erase_element(const KeyT& k);
         KeyT& emplace_element(const KeyT& k);
-
+        void delete_farthest_request(const KeyT& k);  //  finds and deletes element that will not be uset for a long time
+        
 public :
 
-        belady(const size_t c, const std::list<KeyT>& r) : cap(c) {fill_query_indexes(r); };
+        template <typename Iter> 
+        belady(const size_t cap, const Iter begin, const Iter end) : capacity(cap) 
+        {
+            fill_query_indexes(begin, end);
+        };
+
         bool process_request(const KeyT& k);
     };
 }
 
-template <typename KeyT, typename T> 
-void caches::belady<KeyT, T>::fill_query_indexes(const std::list<KeyT>& r)
+template <typename KeyT, typename T> template <typename Iter> 
+void caches::belady<KeyT, T>::fill_query_indexes(const Iter begin, const Iter end)
 {
     size_t indx = 0;
-    for(auto i : r)
+    for(auto i = begin, e = end; i != e; ++i)
     {
-        auto i_it = query_indexes.find(i);
+        auto iIt = queryIndexes.find(*i);
     
-        if(i_it == query_indexes.end())
-            query_indexes.emplace(i, std::deque<size_t>{indx});
+        if(iIt == queryIndexes.end())
+            queryIndexes.emplace(*i, std::deque<size_t>{indx});
         else
-            i_it->second.emplace_back(indx);
+            iIt->second.emplace_back(indx);
         
         ++indx;
     }  
@@ -51,21 +57,21 @@ void caches::belady<KeyT, T>::fill_query_indexes(const std::list<KeyT>& r)
 template <typename KeyT, typename T> 
 bool caches::belady<KeyT, T>::process_request(const KeyT& k)
 {
-    auto i_it = query_indexes.find(k);
-    assert(i_it != query_indexes.end());
-    i_it->second.erase(i_it->second.begin());
+    auto iIt = queryIndexes.find(k);
+    assert(iIt != queryIndexes.end());
+    iIt->second.erase(iIt->second.begin());
 
-    auto c_it = cache_elements.find(k);
-    if(c_it == cache_elements.end())
+    auto cIt = cacheElements.find(k);
+    if(cIt == cacheElements.end())
     {
-        if(i_it->second.empty()) return false;
+        if(iIt->second.empty()) return false;
     
-        if(cache_list.size() < cap)
+        if(cacheList.size() < capacity)
         {
             emplace_element(k);
             return false;
         }    
-        assert(cache_list.size() == cap);
+        assert(cacheList.size() == capacity);
         
         delete_farthest_request(k);
         emplace_element(k);
@@ -78,48 +84,48 @@ bool caches::belady<KeyT, T>::process_request(const KeyT& k)
 template <typename KeyT, typename T> 
 void caches::belady<KeyT, T>::delete_farthest_request(const KeyT& k)
 {
-    auto i_it = query_indexes.find(k);
-    assert(i_it != query_indexes.end());
+    auto iIt = queryIndexes.find(k);
+    assert(iIt != queryIndexes.end());
 
-    size_t max_dist = 0;
-    auto fr_it = query_indexes.end();
+    size_t maxDist = 0;
+    auto frIt = queryIndexes.end();
 
     //  find farthest request
-    for(auto i : cache_list) 
+    for(auto i : cacheList) 
     {
-        auto i_it = query_indexes.find(i);
-        assert(i_it != query_indexes.end());
+        auto iIt = queryIndexes.find(i);
+        assert(iIt != queryIndexes.end());
         
-        if(i_it->second.empty()) 
+        if(iIt->second.empty()) 
         {
-            fr_it = i_it;
+            frIt = iIt;
             break;
         }
         
-        if(i_it->second.front() > max_dist)
+        if(iIt->second.front() > maxDist)
         {
-            fr_it = i_it;
-            max_dist = fr_it->second.front();
+            frIt = iIt;
+            maxDist = frIt->second.front();
         }
     }
     //  delete it
-    erase_element(fr_it->first);
+    erase_element(frIt->first);
 }
 
 template <typename KeyT, typename T> 
 void caches::belady<KeyT, T>::erase_element(const KeyT& k)
 {
-    auto c_it = cache_elements.find(k);
-    assert(c_it != cache_elements.end());
+    auto cIt = cacheElements.find(k);
+    assert(cIt != cacheElements.end());
 
-    cache_list.erase(c_it->second);
-    cache_elements.erase(c_it);
+    cacheList.erase(cIt->second);
+ cacheElements.erase(cIt);
 }
 
 template <typename KeyT, typename T> 
-KeyT& caches::belady<KeyT, T>::emplace_element(const KeyT& k)
+KeyT& caches::template belady<KeyT, T>::emplace_element(const KeyT& k)
 {
-    cache_list.emplace_front(k);
-    cache_elements.emplace(k, cache_list.begin());
-    return cache_list.front();
+    cacheList.emplace_front(k);
+ cacheElements.emplace(k, cacheList.begin());
+    return cacheList.front();
 }
