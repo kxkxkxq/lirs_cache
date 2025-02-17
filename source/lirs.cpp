@@ -19,7 +19,9 @@ int main()
         return 1;
     }
 
-    caches::lirs<int> lcache{static_cast<size_t>(size)};
+    auto slow_get_page = [](const int key) {return key;};
+    caches::lirs<int> lcache{static_cast<size_t>(size), slow_get_page};
+    
     unsigned nhits = 0;
     for(unsigned i = 0; i < nrequests; ++i)
     {

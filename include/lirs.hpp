@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <queue>                
@@ -11,7 +12,7 @@
 
 namespace caches
 {
-    template <typename KeyT, typename T = std::string> class lirs final
+    template <typename KeyT, typename P = int> class lirs final
     {
         enum Status
         {
@@ -25,33 +26,36 @@ namespace caches
             const size_t cap = 0; 
             std::list<KeyT> list;
 
-            enum Csizes {hsize = 1, lsize = 99 };   //  percentage of hirs and lirs lists sizes 
+            enum CSizes {hsize = 1, lsize = 99 };   //  percentage of hirs and lirs lists sizes 
             
-            list_t(const size_t cs) : cap((cs * hsize / 100) + 1) {};   //  ctor for lhirs
-            list_t(const size_t cs, const size_t hs) : cap(cs - hs) {}; //  ctor for llirs
+            list_t(const size_t cs) : cap((cs * hsize / 100) + 1) {};   //  ctor for lHirs
+            list_t(const size_t cs, const size_t hs) : cap(cs - hs) {}; //  ctor for lLirs
         };
 
-        const size_t csize;
-        list_t lhirs;  //  part of cache for hirs elements (approximately 1% of cache size)
-        list_t llirs;  //  part of cache for lirs elements (approximately 99% of cache size)
-        std::list<KeyT> query_queue; 
+        const size_t cSize = 0;
+        std::function<P(KeyT)> slow_get_page;   //  slow func to get data if it isn't in the cache
+
+        list_t lHirs;  //  part of cache for hirs elements (approximately 1% of cache size)
+        list_t lLirs;  //  part of cache for lirs elements (approximately 99% of cache size)
+        std::list<KeyT> queryQueue; 
 
         struct mnode_t
         {
             Status status = hirr;
+            const P page;   
             
-            using list_iter = typename std::list<KeyT>::iterator;
-            list_iter c_it; //  iterator to cache element
-            list_iter q_it; //  iterator to query queue element
+            using listIter = typename std::list<KeyT>::iterator;
+            listIter cIt; //  iterator to cache element
+            listIter qIt; //  iterator to query queue element
 
-            mnode_t(list_iter q) : q_it(q) {};
+            mnode_t(listIter q, const P p) : qIt(q), page(p) {};
         };
-        std::unordered_map<KeyT, mnode_t> hashtable;  
+        std::unordered_map<KeyT, mnode_t> hashTable;  
         
-        void push_new_request(const KeyT& k);   //  pushes new request to query_queue and hashtable
+        void push_new_request(const KeyT& k);   //  pushes new request to queryQueue and hashTable
         void swap_hir_and_lir(const KeyT& k);   //  swaps last lir  and certain hirr
         
-        void rotate_queue_if(const KeyT& k);    //  move certain element to the beginning of the query_queue 
+        void rotate_queue_if(const KeyT& k);    //  move certain element to the beginning of the queryQueue 
         void queue_push_front(const KeyT& k);
         void queue_prunning();  // pops all unnecessary hirr and hirhr elements
 
@@ -60,175 +64,184 @@ namespace caches
 
 public :
 
-        explicit lirs(const size_t sz = 0) : csize(sz), lhirs(sz), llirs(sz, lhirs.cap) {};
+        template <typename SlowFunc>
+        explicit lirs(const size_t sz, SlowFunc func) : cSize(sz), 
+                                                            slow_get_page(func),
+                                                            lHirs(sz), 
+                                                            lLirs(sz, lHirs.cap) {};
+        
         bool process_request(const KeyT& k);
 
-        const size_t lhirs_cap() const {return lhirs.cap; };
-        const size_t llirs_cap() const {return llirs.cap; };
+        const size_t lhirs_cap() const {return lHirs.cap; };
+        const size_t lLirs_cap() const {return lLirs.cap; };
     };
 }
 
-template <typename KeyT, typename T> 
-bool caches::lirs<KeyT, T>::process_request(const KeyT& k)
+template <typename KeyT, typename P> 
+bool caches::lirs<KeyT, P>::process_request(const KeyT& k)
 {     
-    auto ht_it = hashtable.find(k);
-    if(ht_it == hashtable.end())  //  new request
+    auto htIt = hashTable.find(k);
+    if(htIt == hashTable.end())  //  new request
     {
         push_new_request(k);
-        ht_it = hashtable.find(k);
-        assert(ht_it != hashtable.end());
-        assert(ht_it->second.q_it != query_queue.end());
+        htIt = hashTable.find(k);
+        assert(htIt != hashTable.end());
+        assert(htIt->second.qIt != queryQueue.end());
 
-        if(llirs.list.size() < llirs.cap)
+        if(lLirs.list.size() < lLirs.cap)
         {
-            ht_it->second.status = lir;
-            list_push_front(llirs.list, k);
+            htIt->second.status = lir;
+            list_push_front(lLirs.list, k);
             return false;
         }
 
-        if(lhirs.list.size() == lhirs.cap)
-            list_pop_back(lhirs.list);
+        if(lHirs.list.size() == lHirs.cap)
+            list_pop_back(lHirs.list);
        
-        list_push_front(lhirs.list, k);
+        list_push_front(lHirs.list, k);
         return false;
     }
 
-    assert(ht_it != hashtable.end());    
-    switch(ht_it->second.status)
+    assert(htIt != hashTable.end());    
+    switch(htIt->second.status)
     {
         case lir   :    //  accessing lir element
-                        rotate_queue_if(ht_it->first);
-                        list_push_front(llirs.list, ht_it->first);
+                        rotate_queue_if(htIt->first);
+                        list_push_front(lLirs.list, htIt->first);
                         queue_prunning();
                         return true;
         case hirr  :    //  accessing hir resident element             
-                        if(ht_it->second.q_it != query_queue.end()) 
+                        if(htIt->second.qIt != queryQueue.end()) 
                         {
-                            rotate_queue_if(ht_it->first);  //  if resident hir element 
-                            swap_hir_and_lir(ht_it->first); //  was not in query queue
-                            queue_prunning();               //  it remains in this status
+                            rotate_queue_if(htIt->first);  //  if resident hir element 
+                            swap_hir_and_lir(htIt->first); //  was not in query queue
+                            queue_prunning();              //  it remains in this status
                         }
                         else
-                            queue_push_front(ht_it->first);
+                            queue_push_front(htIt->first);
                         return true;
         case hirnr :    //  accessing hir non-resident element              
-                        list_pop_back(lhirs.list);
-                        list_push_front(lhirs.list, ht_it->first);
+                        list_pop_back(lHirs.list);
+                        list_push_front(lHirs.list, htIt->first);
                         
-                        if(ht_it->second.q_it == query_queue.end())
+                        if(htIt->second.qIt == queryQueue.end())
                         {
-                            queue_push_front(ht_it->first);
+                            queue_push_front(htIt->first);
                             return false;
                         }
 
-                        rotate_queue_if(ht_it->first);
-                        swap_hir_and_lir(ht_it->first);
+                        rotate_queue_if(htIt->first);
+                        swap_hir_and_lir(htIt->first);
                         queue_prunning();
                         return false;
     }
     return false;
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::push_new_request(const KeyT& k)
+template <typename KeyT, typename P>
+void caches::lirs<KeyT, P>::push_new_request(const KeyT& k)
 {
-    query_queue.push_front(k);
-    hashtable.emplace(k, query_queue.begin());
+    P page = slow_get_page(k);
     
-    auto i = hashtable.find(k);
-    assert(i != hashtable.end());
-    assert(*i->second.q_it == query_queue.front());
-    i->second.c_it = lhirs.list.end();  //  c_it == lhirs.list.end() means
-                                        //  there's no key k in cache 
+    queryQueue.push_front(k);
+    hashTable.emplace(k, std::move(mnode_t{queryQueue.begin(), static_cast<KeyT>(page)}));
+                                    //  now typename P is the same as typename KeyT,
+                                    //  cause input data - just keys without pages
+                                                               
+    auto i = hashTable.find(k);
+    assert(i != hashTable.end());
+    assert(*i->second.qIt == queryQueue.front());
+    i->second.cIt = lHirs.list.end();  //  cIt == lHirs.list.end() means
+                                       //  there's no key k in cache 
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::queue_push_front(const KeyT& k)
+template <typename KeyT, typename P> 
+void caches::lirs<KeyT, P>::queue_push_front(const KeyT& k)
 {
-    auto ht_it = hashtable.find(k);
-    assert(ht_it != hashtable.end());
-    assert(ht_it->second.q_it == query_queue.end());
+    auto htIt = hashTable.find(k);
+    assert(htIt != hashTable.end());
+    assert(htIt->second.qIt == queryQueue.end());
 
-    query_queue.push_front(ht_it->first);
-    ht_it->second.q_it = query_queue.begin(); 
-    assert(*ht_it->second.q_it == k);
+    queryQueue.push_front(htIt->first);
+    htIt->second.qIt = queryQueue.begin(); 
+    assert(*htIt->second.qIt == k);
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::list_push_front(std::list<KeyT>& list, const KeyT& k)
+template <typename KeyT, typename P> 
+void caches::lirs<KeyT, P>::list_push_front(std::list<KeyT>& list, const KeyT& k)
 {
-    auto ht_it = hashtable.find(k);
-    assert(ht_it != hashtable.end());
+    auto htIt = hashTable.find(k);
+    assert(htIt != hashTable.end());
 
-    if(ht_it->second.c_it == lhirs.list.end())  
+    if(htIt->second.cIt == lHirs.list.end())  
     {                                           
         list.push_front(k);
-        ht_it->second.c_it = list.begin();
-        assert(ht_it->second.c_it != list.end());
+        htIt->second.cIt = list.begin();
+        assert(htIt->second.cIt != list.end());
     }
     else
-        list.splice(list.begin(), list, ht_it->second.c_it);
+        list.splice(list.begin(), list, htIt->second.cIt);
 }
 
-template <typename KeyT, typename T> 
-void caches::lirs<KeyT, T>::list_pop_back(std::list<KeyT>& list)
+template <typename KeyT, typename P> 
+void caches::lirs<KeyT, P>::list_pop_back(std::list<KeyT>& list)
 {
-    auto ht_it = hashtable.find(list.back());
-    assert(ht_it != hashtable.end());
-    assert(ht_it->second.c_it != lhirs.list.end());
+    auto htIt = hashTable.find(list.back());
+    assert(htIt != hashTable.end());
+    assert(htIt->second.cIt != lHirs.list.end());
 
-    ht_it->second.status = hirnr;
+    htIt->second.status = hirnr;
     list.pop_back();
-    ht_it->second.c_it = lhirs.list.end();  
+    htIt->second.cIt = lHirs.list.end();  
 }
 
-template <typename KeyT, typename T> void caches::lirs<KeyT, T>::rotate_queue_if(const KeyT& k)
+template <typename KeyT, typename P> void caches::lirs<KeyT, P>::rotate_queue_if(const KeyT& k)
 {
-    if(k != query_queue.front())
+    if(k != queryQueue.front())
     {
-        auto ht_it = hashtable.find(k);
-        assert(ht_it != hashtable.end());
-        assert(ht_it->second.q_it != query_queue.end());
-        query_queue.splice(query_queue.begin(), query_queue, ht_it->second.q_it); 
+        auto htIt = hashTable.find(k);
+        assert(htIt != hashTable.end());
+        assert(htIt->second.qIt != queryQueue.end());
+        queryQueue.splice(queryQueue.begin(), queryQueue, htIt->second.qIt); 
     }
 }
 
-template <typename KeyT, typename T> void caches::lirs<KeyT, T>::queue_prunning()
+template <typename KeyT, typename P> void caches::lirs<KeyT, P>::queue_prunning()
 {
-    for(auto i : query_queue) 
+    for(auto i : queryQueue) 
     {
-        auto ht_it = hashtable.find(i);
-        assert(ht_it != hashtable.end());
-        assert(ht_it->first == i);
-        assert(ht_it->second.q_it != query_queue.end());
+        auto htIt = hashTable.find(i);
+        assert(htIt != hashTable.end());
+        assert(htIt->first == i);
+        assert(htIt->second.qIt != queryQueue.end());
 
-        switch(ht_it->second.status)
+        switch(htIt->second.status)
         {
             case lir   :
                             return;
             case hirr  :    
             case hirnr :  
-                            query_queue.pop_back();
-                            ht_it->second.q_it = query_queue.end();
+                            queryQueue.pop_back();
+                            htIt->second.qIt = queryQueue.end();
                             break;
         }
     }
 }
 
-template <typename KeyT, typename T> void caches::lirs<KeyT, T>::swap_hir_and_lir(const KeyT& k)
+template <typename KeyT, typename P> void caches::lirs<KeyT, P>::swap_hir_and_lir(const KeyT& k)
 {
-    auto ht_ith = hashtable.find(k);
-    assert(!llirs.list.empty());
-    auto ht_itl = hashtable.find(llirs.list.back());
+    auto htIth = hashTable.find(k);
+    assert(!lLirs.list.empty());
+    auto htItl = hashTable.find(lLirs.list.back());
 
-    assert(ht_ith != hashtable.end());
-    assert(ht_itl != hashtable.end());
-    assert(ht_ith->second.c_it != lhirs.list.end());
-    assert(ht_itl->second.c_it != lhirs.list.end());
+    assert(htIth != hashTable.end());
+    assert(htItl != hashTable.end());
+    assert(htIth->second.cIt != lHirs.list.end());
+    assert(htItl->second.cIt != lHirs.list.end());
     
-    ht_ith->second.status = lir;
-    ht_itl->second.status = hirr;
+    htIth->second.status = lir;
+    htItl->second.status = hirr;
 
-    llirs.list.splice(llirs.list.begin(), lhirs.list, ht_ith->second.c_it);
-    lhirs.list.splice(lhirs.list.begin(), llirs.list, ht_itl->second.c_it);
+    lLirs.list.splice(lLirs.list.begin(), lHirs.list, htIth->second.cIt);
+    lHirs.list.splice(lHirs.list.begin(), lLirs.list, htItl->second.cIt);
 }

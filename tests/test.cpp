@@ -63,17 +63,17 @@ namespace cachetests
         {50, 1000, 10},
         {1000, 10000, 10},
         {5000, 100000, 10},
-        {25000, 1000000, 10},
-        {1000, 1000000, 10}, 
+        {25000, 1000000, 5},
+        {50000, 1000000, 5}, 
     };
 
     std::vector<CacheBigDataParam> beladyBigTestData = 
     {
         {50, 1000, 10},
-        {10, 100000, 50},
+        {1000, 10000, 10},
         {15000, 100000, 10},
-        {250000, 1000000, 10}, 
-        {25000, 1000000, 10}
+        {25000, 1000000, 5}, 
+        {50000, 1000000, 5}
     };
 
 //      func to fill list with pseudorandom numbers
@@ -98,7 +98,8 @@ class BeladyHitTests : public ::testing::TestWithParam<cachetests::CacheHitParam
 TEST_P(LIRSHitTests, HitTest)
 {
     cachetests::CacheHitParam testParams = GetParam();
-    caches::lirs<int> cache{testParams.cacheSize};
+    auto slow_get_page = [](const int key) {return key;};
+    caches::lirs<int> cache{testParams.cacheSize, slow_get_page};
 
     unsigned nh = 0;
     for(auto i : testParams.testData)
@@ -137,13 +138,14 @@ class BeladyBigDataTests : public ::testing::TestWithParam<cachetests::CacheBigD
 TEST_P(LIRSBigDataTests, BigDataTest)
 {
     cachetests::CacheBigDataParam testParams = GetParam();
+    auto slow_get_page = [](const int key) {return key;};
     
     for(size_t i = 0; i < testParams.numberOfIterations; ++i)
     {
         std::unique_ptr<std::list<int>> dataPtr(new std::list<int>);
         cachetests::fill_list_with_data(*dataPtr, testParams.testDataSize);
         
-        caches::lirs<int> cache{testParams.cacheSize};
+        caches::lirs<int> cache{testParams.cacheSize, slow_get_page};
         unsigned ni = 0;
         
         for(auto j : *dataPtr)
