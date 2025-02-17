@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <string>
@@ -9,12 +10,24 @@
 
 namespace caches
 {
-    template <typename KeyT, typename T = std::string> class belady final
+    template <typename KeyT, typename P = int> class belady final
     {
         const size_t capacity = 0;
-    
+        std::function<P(KeyT)> slow_get_page;   //  slow func to get data if it isn't in the cache
+
         using listIter = typename std::list<KeyT>::iterator;
-        std::unordered_map<KeyT, listIter> cacheElements;
+        class PNode
+        {
+            const P page;
+            listIter ElemIter;
+        
+        public:
+
+            PNode(const P p, listIter elem) : page(p), ElemIter(elem) {};
+            listIter get_list_iter() {return ElemIter;};
+        };
+    
+        std::unordered_map<KeyT, PNode> cacheElements;
         std::unordered_map<KeyT, std::deque<size_t>> queryIndexes;
         std::list<KeyT> cacheList;
 
@@ -23,13 +36,17 @@ namespace caches
         
         void erase_element(const KeyT& k);
         KeyT& emplace_element(const KeyT& k);
-        void delete_farthest_request(const KeyT& k);  //  finds and deletes element that will not be uset for a long time
+        void delete_farthest_request(const KeyT& k);  // finds and deletes element 
+                                                      // that will not be uset for a long time
         
 public :
 
-        template <typename Iter> 
-        belady(const size_t cap, const Iter begin, const Iter end) : capacity(cap) 
-        {
+        template <typename Iter, typename SlowFunc> 
+        belady( const size_t cap, 
+                SlowFunc func, 
+                const Iter begin, 
+                const Iter end) : capacity(cap), slow_get_page(func) 
+        { 
             fill_query_indexes(begin, end);
         };
 
@@ -37,8 +54,8 @@ public :
     };
 }
 
-template <typename KeyT, typename T> template <typename Iter> 
-void caches::belady<KeyT, T>::fill_query_indexes(const Iter begin, const Iter end)
+template <typename KeyT, typename P> template <typename Iter> 
+void caches::belady<KeyT, P>::fill_query_indexes(const Iter begin, const Iter end)
 {
     size_t indx = 0;
     for(auto i = begin, e = end; i != e; ++i)
@@ -54,8 +71,8 @@ void caches::belady<KeyT, T>::fill_query_indexes(const Iter begin, const Iter en
     }  
 }
 
-template <typename KeyT, typename T> 
-bool caches::belady<KeyT, T>::process_request(const KeyT& k)
+template <typename KeyT, typename P> 
+bool caches::belady<KeyT, P>::process_request(const KeyT& k)
 {
     auto iIt = queryIndexes.find(k);
     assert(iIt != queryIndexes.end());
@@ -81,8 +98,8 @@ bool caches::belady<KeyT, T>::process_request(const KeyT& k)
     return true;
 }
 
-template <typename KeyT, typename T> 
-void caches::belady<KeyT, T>::delete_farthest_request(const KeyT& k)
+template <typename KeyT, typename P> 
+void caches::belady<KeyT, P>::delete_farthest_request(const KeyT& k)
 {
     auto iIt = queryIndexes.find(k);
     assert(iIt != queryIndexes.end());
@@ -112,20 +129,24 @@ void caches::belady<KeyT, T>::delete_farthest_request(const KeyT& k)
     erase_element(frIt->first);
 }
 
-template <typename KeyT, typename T> 
-void caches::belady<KeyT, T>::erase_element(const KeyT& k)
+template <typename KeyT, typename P> 
+void caches::belady<KeyT, P>::erase_element(const KeyT& k)
 {
     auto cIt = cacheElements.find(k);
     assert(cIt != cacheElements.end());
 
-    cacheList.erase(cIt->second);
- cacheElements.erase(cIt);
+    cacheList.erase(cIt->second.get_list_iter());
+    cacheElements.erase(cIt);
 }
 
-template <typename KeyT, typename T> 
-KeyT& caches::template belady<KeyT, T>::emplace_element(const KeyT& k)
+template <typename KeyT, typename P> 
+KeyT& caches::template belady<KeyT, P>::emplace_element(const KeyT& k)
 {
+    P page = slow_get_page(k);
     cacheList.emplace_front(k);
- cacheElements.emplace(k, cacheList.begin());
+    
+    cacheElements.emplace(k, std::move(PNode{static_cast<KeyT>(page),cacheList.begin()}));
+                                        //  now typename P is the same as typename KeyT,
+                                        //  cause input data - just keys without pages   
     return cacheList.front();
 }

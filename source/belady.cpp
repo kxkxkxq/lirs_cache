@@ -23,16 +23,19 @@ int main()
         std::cin >> key;
         if(std::cin.fail())
         {
-            std::cerr << "Input error\n";
+            std::cerr << "Input error" << std::endl;
             return 1;
         }
         requests.push_back(key);
     }
+    
+    auto slow_get_page = [](const int key) {return key;};
 
-    caches::belady<int> bCache(size, requests.begin(), requests.end());
+    caches::belady<int> bCache(size, slow_get_page, requests.begin(), requests.end());
+    
     unsigned nHits = 0;
     for(auto i : requests)
         nHits += bCache.process_request(i);
 
-    std::cout << nHits << '\n';
+    std::cout << nHits << std::endl;
 }

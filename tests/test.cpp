@@ -111,7 +111,10 @@ TEST_P(LIRSHitTests, HitTest)
 TEST_P(BeladyHitTests, HitTest)
 {
     cachetests::CacheHitParam testParams = GetParam();
-    caches::belady<int> cache{  testParams.cacheSize, 
+    auto slow_get_page = [](const int key) {return key;};
+    
+    caches::belady<int> cache{  testParams.cacheSize,
+                                slow_get_page, 
                                 testParams.testData.begin(),
                                 testParams.testData.end()};
 
@@ -161,13 +164,15 @@ TEST_P(LIRSBigDataTests, BigDataTest)
 TEST_P(BeladyBigDataTests, BigDataTest)
 {
     cachetests::CacheBigDataParam testParams = GetParam();
+    auto slow_get_page = [](const int key) {return key;};
     
     for(size_t i = 0; i < testParams.numberOfIterations; ++i)
     {
         std::unique_ptr<std::list<int>> dataPtr(new std::list<int>);
         cachetests::fill_list_with_data(*dataPtr, testParams.testDataSize);
         
-        caches::belady<int> cache{  testParams.cacheSize, 
+        caches::belady<int> cache{  testParams.cacheSize,
+                                    slow_get_page, 
                                     dataPtr->begin(),
                                     dataPtr->end()};
         unsigned ni = 0;
