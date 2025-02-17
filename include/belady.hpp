@@ -25,6 +25,7 @@ namespace caches
 
             PNode(const P p, listIter elem) : page(p), ElemIter(elem) {};
             listIter get_list_iter() {return ElemIter;};
+            const P get_page() const noexcept {return page;};
         };
     
         std::unordered_map<KeyT, PNode> cacheElements;
