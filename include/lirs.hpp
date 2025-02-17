@@ -66,9 +66,9 @@ public :
 
         template <typename SlowFunc>
         explicit lirs(const size_t sz, SlowFunc func) : cSize(sz), 
-                                                            slow_get_page(func),
-                                                            lHirs(sz), 
-                                                            lLirs(sz, lHirs.cap) {};
+                                                        slow_get_page(func),
+                                                        lHirs(sz), 
+                                                        lLirs(sz, lHirs.cap) {};
         
         bool process_request(const KeyT& k);
 
