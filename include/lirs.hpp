@@ -141,8 +141,6 @@ bool caches::lirs<KeyT, P>::process_request(const KeyT& k)
 template <typename KeyT, typename P>
 void caches::lirs<KeyT, P>::push_new_request(const KeyT& k)
 {
-    P page = slow_get_page(k);
-    
     queryQueue.push_front(k);
     hashTable.emplace(k, std::move(mnode_t{slow_get_page(k), queryQueue.begin()}));
                                                              
