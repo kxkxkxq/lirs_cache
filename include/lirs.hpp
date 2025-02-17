@@ -48,7 +48,7 @@ namespace caches
             listIter cIt; //  iterator to cache element
             listIter qIt; //  iterator to query queue element
 
-            mnode_t(listIter q, const P p) : qIt(q), page(p) {};
+            mnode_t(const P p, listIter q) : page(p), qIt(q) {};
         };
         std::unordered_map<KeyT, mnode_t> hashTable;  
         
@@ -144,10 +144,8 @@ void caches::lirs<KeyT, P>::push_new_request(const KeyT& k)
     P page = slow_get_page(k);
     
     queryQueue.push_front(k);
-    hashTable.emplace(k, std::move(mnode_t{queryQueue.begin(), static_cast<KeyT>(page)}));
-                                    //  now typename P is the same as typename KeyT,
-                                    //  cause input data - just keys without pages
-                                                               
+    hashTable.emplace(k, std::move(mnode_t{slow_get_page(k), queryQueue.begin()}));
+                                                             
     auto i = hashTable.find(k);
     assert(i != hashTable.end());
     assert(*i->second.qIt == queryQueue.front());

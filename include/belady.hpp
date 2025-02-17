@@ -143,11 +143,7 @@ void caches::belady<KeyT, P>::erase_element(const KeyT& k)
 template <typename KeyT, typename P> 
 KeyT& caches::template belady<KeyT, P>::emplace_element(const KeyT& k)
 {
-    P page = slow_get_page(k);
     cacheList.emplace_front(k);
-    
-    cacheElements.emplace(k, std::move(PNode{static_cast<KeyT>(page),cacheList.begin()}));
-                                        //  now typename P is the same as typename KeyT,
-                                        //  cause input data - just keys without pages   
+    cacheElements.emplace(k, std::move(PNode{slow_get_page(k), cacheList.begin()})); 
     return cacheList.front();
 }

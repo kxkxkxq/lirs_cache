@@ -30,7 +30,6 @@ int main()
     }
     
     auto slow_get_page = [](const int key) {return key;};
-
     caches::belady<int> bCache(size, slow_get_page, requests.begin(), requests.end());
     
     unsigned nHits = 0;
